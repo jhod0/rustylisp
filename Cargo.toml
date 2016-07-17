@@ -1,0 +1,19 @@
+[package]
+name = "rustylisp"
+version = "0.1.0"
+authors = ["Jackson O'Donnell <jasksonhodonnell@gmail.com>"]
+
+[dependencies]
+
+
+[profile.dev]
+debug = true
+
+[lib]
+name = "rustylisp"
+doc = true
+doctest = true
+
+[[bin]]
+name = "rustylisp"
+doc = false

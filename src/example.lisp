@@ -1,0 +1,5 @@
+(define (test-fun arg1 arg2)
+  (let ((thing1 (do-to arg1))
+        (thing2 (do-to arg2)))
+    (with-action-to (new-name thing1)
+       (do-with new-name thing2))))
