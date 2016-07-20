@@ -1,5 +1,5 @@
 pub use super::lexer::{Token, LexError};
-use super::lexer::{Lexer, StringIter};
+use super::lexer::{self, Lexer, StringIter};
 use ::core::obj::{LispObj, AsLispObjRef};
 
 use std::convert::Into;
@@ -20,8 +20,7 @@ pub type ParseResult<E> = Result<LispObj, ParserError<E>>;
 
 #[derive(Debug, Copy, Clone)]
 pub enum ParserState {
-    Idle,
-    List,
+    Idle, ReaderChar(char), List,
 }
 
 #[must_use]
@@ -46,13 +45,28 @@ impl<E: fmt::Debug> ParserError<E> {
     }
 }
 
+impl<I,E> fmt::Debug for Parser<I,E>
+    where I: Iterator<Item=Result<char,E>> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let mut fmter = fmt.debug_struct("Parser");
+        let mut fmtref = match self.stack.last() {
+            Some(&(ref state, _)) => fmter.field("state", state),
+            None => &mut fmter,
+        };
+        fmtref.field("lexer", &self.stream).finish()
+    }
+}
+
 impl Parser<StringIter, ()> {
     pub fn from_string<Source, Name>(s: Source, name: Name) -> Self 
                 where Source: Into<String>, Name: Into<String> {
-        Parser {
-            stack: Vec::new(),
-            stream: Lexer::from_string(s, name)
-        }
+        Self::new(lexer::CharIter::from_string(s), name.into())
+    }
+}
+
+impl<I: Iterator<Item=char>> Parser<lexer::CharIter<I>, ()> {
+    pub fn from_iter(stream: I, name: String) -> Self {
+        Self::new(lexer::CharIter::new(stream), name)
     }
 }
 

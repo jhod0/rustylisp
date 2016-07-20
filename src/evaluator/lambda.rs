@@ -22,7 +22,7 @@ pub fn lambda_apply(func: &Procedure, arg: LispObjRef) -> EvalResult {
             // let mut lvl = 0;
             loop {
                 // println!("application of {}: lvl {}", fname, lvl);
-                // println!("\targ = {:?}", last_to_eval);
+                // println!("\targ = {}", last_to_eval);
 
                 let (new_env, new_lte) = match last_to_eval.cons_split() {
                     Some((hd, tl)) => {
@@ -101,7 +101,7 @@ pub fn start_procedure(procd: &Procedure, args: LispObjRef) -> EvalResult<(Envir
 /// # }
 /// ```
 pub fn parse_args(arity: &ArityObj, mut args: LispObjRef, env: EnvironmentRef) -> EvalResult<Environment> {
-    let mut new_env = Environment::with_parent(env);
+    let mut new_env = Environment::from_parent(env);
 
     for (ind, name) in arity.argnames.iter().enumerate() {
         args = match args.cons_split() {
@@ -122,7 +122,7 @@ pub fn parse_args(arity: &ArityObj, mut args: LispObjRef, env: EnvironmentRef) -
             if args.is_nil() {
                 Ok(new_env)
             } else {
-                arity_error!("Extra args: {:?}", args)
+                arity_error!("Extra args: {}", args)
             }
         },
     }
@@ -152,7 +152,7 @@ pub fn parse_multiple_arity(args: &[LispObjRef], parent: EnvironmentRef) -> Eval
     let mut clauses = vec![];
 
     for clause in args.iter() {
-        clauses.push(try!(parse_arglist_body(clause.clone())));
+        clauses.push(try!(parse_arglist_body(clause.clone(), parent.clone())));
     }
 
     if clauses.is_empty() {
@@ -162,13 +162,13 @@ pub fn parse_multiple_arity(args: &[LispObjRef], parent: EnvironmentRef) -> Eval
     }
 }
 
-fn parse_arglist_body(args: LispObjRef) -> EvalResult<(ArityObj, Vec<LispObjRef>)> {
+fn parse_arglist_body(args: LispObjRef, env: EnvironmentRef) -> EvalResult<(ArityObj, Vec<LispObjRef>)> {
     if let Some((hd, tl)) = args.cons_split() {
         let arity = try!(parse_arglist(hd));
-        let body = flatten_list!(tl, "poorly-formed function body");
+        let body = flatten_list!(env env; tl, "poorly-formed function body");
         Ok((arity, body))
     } else {
-        syntax_error!("invalid lambda expression: {:?}", cons!(symbol!("lambda"), args))
+        syntax_error!("invalid lambda expression: {}", cons!(symbol!("lambda"), args))
     }
 }
 
@@ -188,11 +188,11 @@ fn parse_arglist(args: LispObjRef) -> EvalResult<ArityObj> {
                 Some((hd, tl)) => {
                     match hd.symbol_ref() {
                         Some(name) => argnames.push(name.clone()),
-                        None       => syntax_error!("ill-formed argument list {:?}", args)
+                        None       => syntax_error!("ill-formed argument list {}", args)
                     };
                     tl
                 },
-                None => syntax_error!("invalid argument list {:?}", args)
+                None => syntax_error!("invalid argument list {}", args)
             }
         }
     }

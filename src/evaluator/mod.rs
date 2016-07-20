@@ -28,32 +28,32 @@ macro_rules! check_type {
     ( $val:expr, LInt ) => {
         match *($val) {
             $crate::core::LispObj::LInt(n) => n,
-            _ => type_error!("expected int, got {:?}", $val),
+            _ => type_error!("expected int, got {}", $val),
         }
     };
     ( $val:expr, LFloat ) => {
         match *($val) {
             $crate::core::LispObj::LFloat(n) => n,
-            _ => type_error!("expected int, got {:?}", $val),
+            _ => type_error!("expected int, got {}", $val),
         }
     };
     ( $val:expr, LSymbol ) => {
         match *($val) {
             $crate::core::LispObj::LSymbol(ref name) => name.clone(),
-            _ => type_error!("expected symbol, got {:?}", $val),
+            _ => type_error!("expected symbol, got {}", $val),
         }
     };
     ( $val:expr, LString ) => {
         match *($val) {
             $crate::core::LispObj::LString(ref name) => name.clone(),
-            _ => type_error!("expected symbol, got {:?}", $val),
+            _ => type_error!("expected symbol, got {}", $val),
         }
     };
     ( $val:expr, LCons ) => { 
         {
             let macro_ret: (LispObjRef, LispObjRef) = match $val.cons_split() {
                 Some(v) => v,
-                None => type_error!("expected cons, got {:?}", $val),
+                None => type_error!("expected cons, got {}", $val),
             };
 
             macro_ret
@@ -68,17 +68,43 @@ macro_rules! check_type {
 ///
 /// See module `err_msgs` for more on errors.
 macro_rules! flatten_list {
-    ( $val:expr, $( $msg:expr ),+ ) => {
-        match $val.list_to_vec() {
-            Some(vec) => vec,
-            None => { 
+    ( env $env:expr; $val:expr, $( $msg:expr ),+ ) => {
+        {
+            let mut flatten_list_tmp = $val.clone();
+            let mut flatten_list_out = vec![];
+
+            while let Some((hd, tl)) = flatten_list_tmp.cons_split() {
+                flatten_list_tmp = if hd.is_special_char() {
+                    let ch = hd.unwrap_special_char();
+                    match $env.borrow().get_char_handler(ch) {
+                        Some(handler) => { 
+                            if let Some((arg, tail)) = tl.cons_split() {
+                                let output = try!($crate::evaluator::apply(handler, cons!(arg, nil!()), $env.clone()));
+                                flatten_list_out.push(output.to_obj_ref());
+                                tail
+                            } else {
+                                runtime_error!("reader-error", "no argument to special char: {}", ch)
+                            }
+                        },
+                        None => runtime_error!("reader-error", "no handler for special char: {}", ch)
+                    }
+                } else {
+                    flatten_list_out.push(hd);
+                    tl
+                }
+            }
+
+            if !flatten_list_tmp.is_nil() {
                 let flatten_list_macro_msg = format!( $( $msg ),+ );
-                syntax_error!("{}: {:?}", flatten_list_macro_msg, $val)
-            },
+                syntax_error!("{}: {}", flatten_list_macro_msg, $val)
+            } else {
+                flatten_list_out
+            }
         }
     };
 }
 
+/*
 #[macro_export]
 macro_rules! try_rethrow {
     ( $val:expr, ) => {
@@ -87,6 +113,7 @@ macro_rules! try_rethrow {
         }
     }
 }
+*/
 
 #[macro_export]
 macro_rules! runtime_error {
@@ -113,8 +140,6 @@ macro_rules! runtime_error {
 
 /********************* Imports ************************/
 
-use std::convert::AsRef;
-
 // There are some useful error reporting macros in err_msgs
 #[macro_use]
 pub mod err_msgs;
@@ -127,7 +152,7 @@ mod tco;
 
 
 pub use core::{LispObj, LispObjRef, 
-            Environment, EnvironmentRef, AsLispObjRef};
+               Environment, EnvironmentRef, AsLispObjRef};
 pub use core::{RuntimeError, EvalResult};
 
 /******************** Global evaluator type **************/
@@ -135,20 +160,24 @@ pub use core::{RuntimeError, EvalResult};
 pub struct Evaluator {
     global: Environment
 }
- 
 
 /******************** Environment Utilities ************************/
 
 pub fn default_environment() -> Environment {
     let bindings = builtins::BUILTIN_FUNCS.iter()
-                                     .map(|&(ref name, ref func)| {
-                                         (String::from(*name), LispObj::make_native(*name, *func, None).to_obj_ref())
-                                     })
-                                     .chain(builtins::builtin_vals().into_iter()
-                                                      .map(|(name, obj)| (String::from(name), obj.to_obj_ref()))
-                                     );
+                .map(|&(ref name, ref func)| {
+                    (String::from(*name), LispObj::make_native(*name, *func, None).to_obj_ref())
+                })
+                .chain(builtins::builtin_vals().into_iter()
+                    .map(|(name, obj)| (String::from(name), obj.to_obj_ref()))
+                );
 
-    Environment::new_with_bindings(bindings)
+    let char_handlers = macros::SPECIAL_CHAR_DEFAULTS.iter()
+        .map(|&(name, ref func)| {
+            (name, LispObj::make_native(format!("char-handler({})", name), *func, None).to_obj_ref())
+        });
+
+    Environment::new_with_bindings(bindings).with_special_chars(char_handlers)
 }
 
 
@@ -179,21 +208,31 @@ pub fn eval_all<It, Obj>(forms: It, env: EnvironmentRef) -> Result<Vec<LispObj>,
 pub fn map_eval(ls: LispObjRef, env: EnvironmentRef) -> EvalResult {
     if ls.is_nil() {
         Ok(nil!())
-    } else if let Some((hd, tl)) = ls.cons_split() {
-        let this = try!(eval(hd, env.clone()));
-        let rest = match map_eval(tl, env) {
-            Ok(res) => res,
-            Err(err) => {
-                if err.errname == "syntax-error" {
-                    syntax_error!("improperly formed list: {:?}", ls)
-                } else {
-                    return Err(err)
+    } else if let Some((hd, mut tl)) = ls.cons_split() {
+        let this = {
+            if hd.is_special_char() {
+                let ch = hd.unwrap_special_char();
+                match env.borrow().get_char_handler(ch) {
+                    Some(handler) => { 
+                        if let Some((arg, tail)) = tl.cons_split() {
+                            let output = try!(apply(handler, cons!(arg, nil!()), env.clone()));
+                            tl = tail;
+                            try!(eval(output, env.clone()))
+                        } else {
+                            runtime_error!("reader-error", "no argument to special char: {}", ch)
+                        }
+                    },
+                    None => runtime_error!("reader-error", "no handler for special char: {}", ch)
                 }
-            },
+            } else {
+                try!(eval(hd, env.clone()))
+            }
         };
+
+        let rest = try!(map_eval(tl, env));
         Ok(cons!(this, rest))
     } else {
-        syntax_error!("not a proper list: {:?}", ls)
+        syntax_error!("not a proper list: {}", ls)
     }
 }
 
@@ -223,7 +262,7 @@ pub fn eval<Obj>(form_input: Obj, env: EnvironmentRef) -> EvalResult
                // Try special form
                match special_form_handlers::get_handler(s) {
                    Some(handler) => {
-                       let tl_vec = flatten_list!(tl, "({}) invalid syntax (ill-formed arg list)", s);
+                       let tl_vec = flatten_list!(env env; tl, "({}) invalid syntax (ill-formed arg list)", s);
                        return handler(&tl_vec, env)
                    },
                    None => {},
@@ -244,7 +283,7 @@ pub fn eval<Obj>(form_input: Obj, env: EnvironmentRef) -> EvalResult
             return apply(func, args, env);
         }
 
-        runtime_error!("eval-error", "unable to evaluate: {:?}", form)
+        runtime_error!("eval-error", "unable to evaluate: {}", form)
     }
 }
 
@@ -254,9 +293,8 @@ pub fn apply<Obj1, Obj2>(proc_input: Obj1, arg_input: Obj2, env: EnvironmentRef)
     let procedure = proc_input.to_obj_ref();
     let arg = arg_input.to_obj_ref();
 
-    let args = flatten_list!(arg.clone(), "(apply) ill-formed argument list");
-
     if procedure.is_native() {
+        let args = flatten_list!(env env; arg.clone(), "(apply) ill-formed argument list");
         match (*procedure).clone().unwrap_native()(&args, env) {
             Ok(obj) => Ok(obj),
             Err(err) => {
@@ -267,7 +305,9 @@ pub fn apply<Obj1, Obj2>(proc_input: Obj1, arg_input: Obj2, env: EnvironmentRef)
                 })
             },
         }
-    } else if procedure.is_proc() {
+    } 
+
+    else if procedure.is_proc() {
         let err = {
             let procd = procedure.unwrap_proc();
             match self::lambda::lambda_apply(procd, arg) {
@@ -276,7 +316,9 @@ pub fn apply<Obj1, Obj2>(proc_input: Obj1, arg_input: Obj2, env: EnvironmentRef)
             }
         };
         Err(RuntimeError::new_from(err, procedure))
-    } else {
-        type_error!("expecting procedure, got {:?}", procedure);
+    } 
+
+    else {
+        type_error!("expecting procedure, got {}", procedure);
     }
 }

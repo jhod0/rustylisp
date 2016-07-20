@@ -1,5 +1,5 @@
 use std::cell::RefCell; 
-use std::fmt::{self, Debug};
+use std::fmt::{self, Display};
 use std::{fs, io};
 use std::rc::Rc;
 
@@ -8,16 +8,19 @@ use ::parser;
 use super::EnvironmentRef;
 use self::LispObj::*;
 
-pub type NativeFunc                 = fn(&[LispObjRef], EnvironmentRef) -> EvalResult;
+pub type NativeFuncSignature        = fn(&[LispObjRef], EnvironmentRef) -> EvalResult;
 pub type LispObjRef<Obj=LispObj>    = Rc<Obj>;
 
 #[derive(Clone)]
+pub struct NativeFunc(Rc<NativeFuncSignature>);
+
+#[derive(Clone, Debug)]
 pub struct ArityObj { 
     pub argnames: Vec<String>,
     pub rest: Option<String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Procedure {
     pub env: EnvironmentRef,
     pub name: Option<String>,
@@ -27,7 +30,7 @@ pub struct Procedure {
 
 /// A type which represents Lisp objects.
 // TODO: Implement Clone
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum LispObj {
     /// An integer
     LInteger(i64),
@@ -47,9 +50,7 @@ pub enum LispObj {
     LVector(Vec<LispObjRef>),
 
     /// A function implemented in Rust
-    // (ideally would just be NativeFunc, but alas
-    //  fn's don't implement clone...)
-    LNativeFunc(String, Option<Rc<String>>, Rc<NativeFunc>),
+    LNativeFunc(String, Option<Rc<String>>, NativeFunc),
 
     /// A function
     LProcedure(Procedure),
@@ -88,6 +89,12 @@ impl PartialEq for LispObj {
     }
 }
 
+impl fmt::Debug for NativeFunc {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "NativeFunc(_)")
+    }
+}
+
 impl ArityObj {
     pub fn new(names: Vec<String>, rest: Option<String>) -> Self {
         ArityObj {
@@ -96,7 +103,7 @@ impl ArityObj {
     }
 }
 
-impl fmt::Debug for ArityObj {
+impl fmt::Display for ArityObj {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         try!(write!(fmt, "<arity-obj:"));
         try!(write!(fmt, "("));
@@ -154,14 +161,21 @@ impl Procedure {
 
 impl Eq for LispObj { }
 
-impl Debug for LispObj {
+impl Display for LispObj {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
             &LInteger(ref me)   => write!(fmt, "{}", me),
             &LFloat(ref me)     => write!(fmt, "{}", me),
             &LString(ref me)    => write!(fmt, "\"{}\"", me),
             &LSymbol(ref me)    => write!(fmt, "'{}", me),
-            &LChar(ref me)      => write!(fmt, "#\\{}", me),
+            &LChar(ref me)      => {
+                match *me {
+                    ' '  => write!(fmt, "\\space"),
+                    '\t' => write!(fmt, "\\tab"),
+                    '\n' => write!(fmt, "\\newline"),
+                    _    => write!(fmt, "\\{}", me),
+                }
+            },
             // TODO implement
             &LCons(ref head, ref tail)
                                 => {
@@ -176,7 +190,7 @@ impl Debug for LispObj {
                 let mut rest = tail.clone();
                 while !rest.is_nil() {
                     if let Some((hd, tl)) = rest.cons_split() {
-                        try!(write!(fmt, "{:?}", *hd));
+                        try!(write!(fmt, "{}", *hd));
 
                         if tl.is_nil() {
                             break;
@@ -185,7 +199,7 @@ impl Debug for LispObj {
                         try!(write!(fmt, " "));
                         rest = tl;
                     } else {
-                        try!(write!(fmt, ". {:?}", *rest));
+                        try!(write!(fmt, ". {}", *rest));
                         break;
                     }
                 }
@@ -211,9 +225,7 @@ impl Debug for LispObj {
                     None => write!(fmt, "<anonymous-function>")
                 }
             },
-            &LError(ref err)    => {
-                write!(fmt, "{:?}", err)
-            },
+            &LError(ref err)    => write!(fmt, "{}", err),
             &LSpecialChar(ref c) 
                                 => write!(fmt, "{}", c),
             &LParserFileStream(ref stream) => write!(fmt, "<parser-stream:{}>", stream.borrow().source_name()),
@@ -251,7 +263,6 @@ impl<'a> AsLispObjRef for &'a LispObj {
         Rc::new(self.clone())
     }
 }
-
 
 impl LispObj {
     /// Returns true if self is a 'falsey' value,
@@ -321,9 +332,9 @@ impl LispObj {
         LSymbol(name.into())
     }
 
-    pub fn make_native<S: Into<String>>(name: S, val: NativeFunc, doc: Option<S>) -> Self {
+    pub fn make_native<S: Into<String>>(name: S, val: NativeFuncSignature, doc: Option<S>) -> Self {
         LNativeFunc(name.into(), doc.map(|s| Rc::new(s.into())),
-                    Rc::new(val))
+                    NativeFunc(Rc::new(val)))
     }
 
     /// Forms a cons-cell of two objects.
@@ -353,21 +364,28 @@ impl LispObj {
     pub fn unwrap_symbol(self) -> String {
         match self {
             LSymbol(s) => s,
-            val => panic!("unwrap_symbol performed on non-symbol: {:?}", val),
+            val => panic!("unwrap_symbol performed on non-symbol: {}", val),
         }
     }
 
-    pub fn unwrap_native(self) -> Rc<NativeFunc> {
+    pub fn unwrap_native(self) -> Rc<NativeFuncSignature> {
         match self {
-            LNativeFunc(_,_,f) => f,
-            val => panic!("unwrap_native performed on non-native-func {:?}", val),
+            LNativeFunc(_,_,NativeFunc(ref f)) => f.clone(),
+            val => panic!("unwrap_native performed on non-native-func {}", val),
+        }
+    }
+
+    pub fn unwrap_special_char(&self) -> char {
+        match self {
+            &LSpecialChar(ref ch) => *ch,
+            val => panic!("Cannot unwrap_special_char {}", val)
         }
     }
 
     pub fn unwrap_proc(&self) -> &Procedure {
         match self {
             &LProcedure(ref procd) => procd,
-            val => panic!("Cannot unwrap_proc on non-procedure {:?}", val)
+            val => panic!("Cannot unwrap_proc on non-procedure {}", val)
         }
     }
 

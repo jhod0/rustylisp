@@ -79,7 +79,7 @@ pub fn special_form_tco_until_last(form_name: &str, initial_args: &[LispObjRef],
             Some((hd, tl)) => { 
                 if let Some(s) = hd.symbol_ref() {
                     if let Ok(ind) = TCO_BUILTINS.binary_search(&s.as_str()) {
-                        let vec = flatten_list!(tl, "ill-formed-list");
+                        let vec = flatten_list!(env env; tl, "ill-formed-list");
                         (TCO_BUILTINS[ind], vec)
                     } else {
                         /* TODO check if s is macro,
@@ -117,7 +117,7 @@ pub fn begin_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult 
 
 pub fn if_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     if args.len() != 3 {
-        syntax_error!("wrong number of arguments to if: {:?}", args)
+        syntax_error!("wrong number of arguments to if: {}", LispObj::to_lisp_list(args.iter()))
     }
 
     let cond     = args[0].clone();
@@ -136,23 +136,27 @@ pub fn if_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 /// Let has a different type signature because it can generate a new bindings frame,
 /// which would be destroyed if it wasn't returned
 pub fn let_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult<(EnvironmentRef, LispObj)> {
-    let new_env = Environment::with_parent(env.clone()).to_env_ref();
+    let new_env = Environment::from_parent(env.clone()).to_env_ref();
 
     if args.len() < 1 {
         syntax_error!("let must have bindings");
     }
 
-    let bindings = flatten_list!(args[0].clone(), "malformed bindings list");
+    let bindings = flatten_list!(env env; args[0].clone(), "malformed bindings list");
 
     /* TODO named let */
     for binding in bindings.into_iter() {
-        let unwrapped = flatten_list!(binding, "malformed binding");
+        let unwrapped = flatten_list!(env env; binding, "malformed binding");
 
         unpack_args!(unwrapped => name: Any, value: Any);
         if !name.is_symbol() {
-            syntax_error!("malformed binding: expected symbol, got {:?}", name);
+            syntax_error!("malformed binding: expected symbol, got {}", *name);
         }
-        let evaluated = try!(super::eval(value, new_env.clone()));
+
+        let evaluated = match try!(super::eval(value, new_env.clone())) {
+            LispObj::LProcedure(func) => LispObj::LProcedure(func.with_name((*name).clone().unwrap_symbol())),
+            other => other,
+        };
 
         /* Associate evaluated with name */
         new_env.borrow_mut().let_new((*name).clone().unwrap_symbol(), evaluated.to_obj_ref());

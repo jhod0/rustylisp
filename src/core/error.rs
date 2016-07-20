@@ -2,11 +2,11 @@ use std::convert::Into;
 use std::fmt;
 use std::mem;
 
-use super::{LispObj, LispObjRef, AsLispObjRef};
+use super::{LispObj, LispObjRef};
 
 pub type EvalResult<Res=LispObj> = Result<Res, RuntimeError>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RuntimeError {
     pub errname: String,
     pub value:   Option<LispObjRef>,
@@ -61,10 +61,10 @@ impl RuntimeError {
         let trace = self.into_traceback();
 
         for err in trace {
-            let val    = err.value .clone().map_or(String::new(), |val| format!("{:?}", val));
+            let val    = err.value .clone().map_or(String::new(), |val| format!("{}", val));
             println!("{}: {}", err.errname, val);
             match err.source {
-                Some(ref source) => println!("\tfrom {:?}", source),
+                Some(ref source) => println!("\tfrom {}", source),
                 None => {},
             }
         }
@@ -75,17 +75,17 @@ impl RuntimeError {
     }
 }
 
-impl fmt::Debug for RuntimeError {
+impl fmt::Display for RuntimeError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         try!(write!(fmt, "#<ERROR-OBJ {}", self.errname));
 
         match &self.value {
-            &Some(ref val) => { try!(write!(fmt, " value: {:?}", val)); },
+            &Some(ref val) => { try!(write!(fmt, " value: {}", val)); },
             &None => {},
         };
 
         match &self.source {
-            &Some(ref obj) => { try!(write!(fmt, " source: {:?}", obj)); },
+            &Some(ref obj) => { try!(write!(fmt, " source: {}", obj)); },
             &None => {},
         };
 

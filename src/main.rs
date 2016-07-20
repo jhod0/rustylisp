@@ -17,13 +17,12 @@ fn eval<I, E>(parser: Parser<I, E>)
             Ok(obj) => { 
                 let new_ref = env.clone();
                 match evaluator::eval(obj, new_ref) {
-                    Ok(ret) => println!("{:?}", ret),
+                    Ok(ret) => println!("{}", ret),
                     Err(err) => err.dump_traceback(),
                 }
             },
             Err(err) => {
                 println!("Error: {:?}", err);
-                break
             },
         }
     }

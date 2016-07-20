@@ -1,4 +1,5 @@
-use ::core::{self, LispObj, LispObjRef, AsLispObjRef, EnvironmentRef, NativeFunc, EvalResult};
+use ::core::{self, LispObj, LispObjRef, AsLispObjRef, EnvironmentRef, EvalResult};
+use core::obj::NativeFuncSignature;
 use super::eval;
 
 /// # Special Form Handlers
@@ -29,7 +30,7 @@ use super::eval;
  * set!         - yes
  */
 
-pub fn get_handler(s: &str) -> Option<NativeFunc> {
+pub fn get_handler(s: &str) -> Option<NativeFuncSignature> {
     for &(name, handler) in HANDLERS.iter() {
         if s == name {
             return Some(handler);
@@ -39,7 +40,7 @@ pub fn get_handler(s: &str) -> Option<NativeFunc> {
     None
 }
 
-static HANDLERS: &'static [(&'static str, NativeFunc)] =
+static HANDLERS: &'static [(&'static str, NativeFuncSignature)] =
       &[("and", and_handler), ("begin", begin_handler), ("case-lambda", case_lambda_handler), ("catch-error", catch_error_handler),  
         ("define", define_handler), ("define-macro", define_macro_handler),
         ("if", if_handler), ("lambda", lambda_handler), ("let", let_handler), ("or", or_handler), ("quote", quote_handler),
@@ -76,7 +77,7 @@ pub fn catch_error_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResu
 
 pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     if args.len() < 2 {
-        syntax_error!("Not enough arguments to define {:?}", args);
+        syntax_error!("Not enough arguments to define {}", *args[0]);
     }
 
     let (name, value) = if args[0].is_symbol() && args.len() == 2 {
@@ -93,10 +94,10 @@ pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
             (func_name, value)
         } else {
-            syntax_error!("invalid argumetnts to define: {:?}", &args[0..])
+            syntax_error!("invalid argumetnts to define: {}", LispObj::to_lisp_list(args.iter()))
         }
     } else {
-        syntax_error!("define must have symbol name to define, not {:?}", args[0])
+        syntax_error!("define must have symbol name to define, not {}", *args[0])
     };
 
     let top_level = core::env::get_top_level(env);
@@ -110,7 +111,7 @@ pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         match borrowed_mut.let_new(name.clone(), value.to_obj_ref()) {
             Some(_) => {
                 if allow_red.falsey() {
-                    redefine_error!("symbol {:?} is already bound", name)
+                    redefine_error!("symbol {} is already bound", name)
                 } else {
                     Ok(symbol!(name))
                 }
@@ -122,7 +123,7 @@ pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
 pub fn define_macro_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     if args.len() < 2 {
-        syntax_error!("Not enough arguments to define-macro: {:?}", args)
+        syntax_error!("Not enough arguments to define-macro: {}", LispObj::to_lisp_list(args.iter()))
     }
 
     if let Some((hd, tl)) = args[0].cons_split() {
@@ -135,7 +136,7 @@ pub fn define_macro_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalRes
             match env.borrow_mut().let_macro(macro_name.clone(), value.to_obj_ref()) {
                 Some(_) => {
                     if allow_red.falsey() {
-                        redefine_error!("macro {:?} is already bound", macro_name)
+                        redefine_error!("macro {} is already bound", macro_name)
                     } else {
                         Ok(symbol!(macro_name))
                     }
@@ -143,10 +144,10 @@ pub fn define_macro_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalRes
                 None    => Ok(symbol!(macro_name))
             }
         } else {
-            syntax_error!("invalid macro definition: {:?}", args)
+            syntax_error!("invalid macro definition: {}", LispObj::to_lisp_list(args.iter()))
         }
     } else {
-        syntax_error!("invalid macro definition: {:?}", args)
+        syntax_error!("invalid macro definition: {}", LispObj::to_lisp_list(args.iter()))
     }
 }
 

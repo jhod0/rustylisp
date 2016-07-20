@@ -46,30 +46,43 @@ pub type LexResult<T, E> = Result<T, LexError<E>>;
 /// Must use, a lexer does nothing unless consumed
 #[must_use]
 pub struct Lexer<I: Iterator<Item=Result<char,E>>, E> {
-    #[allow(dead_code)]
     pub source_name: String,
     pub line_no: u32, 
     pub col_no: u32,
     source: Peekable<I>,
 }
 
-#[allow(dead_code)]
-pub struct StringIter {
-    s: vec::IntoIter<char>
+pub struct CharIter<I> {
+    s: I
+}
+
+pub type StringIter = CharIter<vec::IntoIter<char>>;
+
+impl<I: Iterator<Item=Result<char,E>>, E> fmt::Debug for Lexer<I,E> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt.debug_struct("Lexer")
+           .field("source_name", &self.source_name)
+           .field("line_no", &self.line_no)
+           .field("col_no", &self.col_no)
+           .finish()
+    }
 }
 
 impl Lexer<StringIter, ()> {
     pub fn from_string<Source, Name>(input: Source, source_name: Name) -> Self 
             where Source: Into<String>, Name: Into<String> {
-        Lexer { source_name: source_name.into(),
-                line_no: 0, col_no: 0,
-                source: StringIter::new(input).peekable()
-        }
+        Self::new(CharIter::from_string(input),
+                        source_name.into())
+    }
+}
+
+impl<I: Iterator<Item=char>> Lexer<CharIter<I>, ()> {
+    pub fn from_iter(it: I, name: String) -> Self {
+        Self::new(CharIter::new(it), name)
     }
 }
 
 impl<I: Iterator<Item=Result<char, E>>, E> Lexer<I, E> {
-    #[allow(dead_code)]
     pub fn new(it: I, name: String) -> Self {
         Lexer { source_name: name,
                 line_no: 0, col_no: 0,
@@ -327,15 +340,21 @@ impl<E> convert::From<E> for LexError<E> {
 
 /******************* StringIter for use above *******************/
 
-impl StringIter {
-    fn new<S: Into<String>>(s: S) -> Self {
-        StringIter { 
-            s: s.into().chars().collect::<Vec<_>>().into_iter(), 
+impl CharIter<vec::IntoIter<char>> {
+    pub fn from_string<S: Into<String>>(s: S) -> Self {
+        CharIter {
+            s: s.into().chars().collect::<Vec<_>>().into_iter()
         }
     }
 }
 
-impl Iterator for StringIter {
+impl<I> CharIter<I> {
+    pub fn new(s: I) -> Self {
+        CharIter { s: s }
+    }
+}
+
+impl<I: Iterator<Item=char>> Iterator for CharIter<I> {
     type Item = Result<char, ()>;
 
     fn next(&mut self) -> Option<Self::Item> {

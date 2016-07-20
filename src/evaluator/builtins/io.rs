@@ -1,4 +1,4 @@
-use ::core::{env, LispObj, LispObjRef, AsLispObjRef, EnvironmentRef};
+use ::core::{env, LispObjRef, AsLispObjRef, EnvironmentRef};
 use ::parser::Parser;
 use ::evaluator::{self, EvalResult};
 

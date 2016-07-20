@@ -1,4 +1,5 @@
-use ::core::{Environment, EnvironmentRef, LispObj, LispObjRef, AsLispObjRef, EvalResult};
+use ::core::{EnvironmentRef, LispObjRef, AsLispObjRef, EvalResult};
+use ::core::obj::NativeFuncSignature;
 
 pub fn get_handler(name: &String, env: EnvironmentRef) -> Option<LispObjRef> {
     env.borrow().lookup_macro(&*name)
@@ -26,4 +27,20 @@ pub fn try_macro_expand(macro_name: &String, args: LispObjRef, env: EnvironmentR
     } else {
         Ok(None)
     }
+}
+
+
+/***************** Special Character Handlers ****************/
+
+pub static SPECIAL_CHAR_DEFAULTS: &'static [(char, NativeFuncSignature)] = 
+    &[('\'', quote_handler), ('\\', backslash_handler)];
+
+fn backslash_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: Any);
+    Ok(cons!(symbol!("symbol->char"), cons!(quote!(arg), nil!())))
+}
+
+fn quote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: Any);
+    Ok(quote!(arg))
 }
