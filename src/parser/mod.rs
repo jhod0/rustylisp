@@ -1,3 +1,4 @@
+//! The lexing and parsing systems
 pub mod parser;
 mod lexer;
 

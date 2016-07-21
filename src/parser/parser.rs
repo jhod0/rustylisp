@@ -13,6 +13,10 @@ pub enum ParserError<E> {
     UnexpectedToken(Token, Option<Token>, u32, u32),
     UnexpectedEndOfInput(ParserState, u32, u32),
     UnexpectedDelimiter(Token, u32, u32),
+    // If no handler for special character,
+    // error the character, its argument
+    SpecialCharError(char, LispObj),
+    NoCharHandler(char),
     LexError(LexError<E>),
 }
 
@@ -23,11 +27,14 @@ pub enum ParserState {
     Idle, ReaderChar(char), List,
 }
 
+pub struct DummyFn;
+
 #[must_use]
-pub struct Parser<I, E> 
+pub struct Parser<I, E, F=DummyFn> 
         where I: Iterator<Item=Result<char,E>> {
     stack: Vec<(ParserState, Vec<LispObj>)>,
     stream: Lexer<I,E>,
+    char_handler: Option<F>,
 }
 
 impl<E: fmt::Debug> ParserError<E> {
@@ -39,13 +46,36 @@ impl<E: fmt::Debug> ParserError<E> {
                 => ParserError::UnexpectedEndOfInput(a, b, c),
             ParserError::UnexpectedDelimiter(a, b, c)
                 => ParserError::UnexpectedDelimiter(a, b, c),
+            ParserError::SpecialCharError(c, obj)
+                => ParserError::SpecialCharError(c, obj),
+            ParserError::NoCharHandler(c)
+                => ParserError::NoCharHandler(c),
             ParserError::LexError(err) 
                 => ParserError::LexError(LexError::ReadError(format!("{:?}", err))),
         }
     }
 }
 
-impl<I,E> fmt::Debug for Parser<I,E>
+impl FnOnce<(char, LispObj)> for DummyFn {
+    type Output = Result<LispObj, Option<LispObj>>;
+    extern "rust-call" fn call_once(self, _: (char, LispObj)) -> Self::Output {
+        unreachable!("called null-struct DummyFn")
+    }
+}
+
+impl FnMut<(char, LispObj)> for DummyFn {
+    extern "rust-call" fn call_mut(&mut self, _: (char, LispObj)) -> Self::Output {
+        unreachable!("called null-struct DummyFn")
+    }
+}
+
+impl Fn<(char, LispObj)> for DummyFn {
+    extern "rust-call" fn call(&self, _: (char, LispObj)) -> Self::Output {
+        unreachable!("called null-struct DummyFn")
+    }
+}
+
+impl<I,E,F> fmt::Debug for Parser<I,E,F>
     where I: Iterator<Item=Result<char,E>> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let mut fmter = fmt.debug_struct("Parser");
@@ -60,12 +90,12 @@ impl<I,E> fmt::Debug for Parser<I,E>
 impl Parser<StringIter, ()> {
     pub fn from_string<Source, Name>(s: Source, name: Name) -> Self 
                 where Source: Into<String>, Name: Into<String> {
-        Self::new(lexer::CharIter::from_string(s), name.into())
+        Self::new(lexer::CharIter::from_string(s), name)
     }
 }
 
 impl<I: Iterator<Item=char>> Parser<lexer::CharIter<I>, ()> {
-    pub fn from_iter(stream: I, name: String) -> Self {
+    pub fn from_iter<S: Into<String>>(stream: I, name: S) -> Self {
         Self::new(lexer::CharIter::new(stream), name)
     }
 }
@@ -76,10 +106,46 @@ impl Parser<io::Chars<File>, io::CharsError> {
     }
 }
 
-impl<I: Iterator<Item=Result<char,E>>, E> Parser<I, E> {
-    pub fn new(source: I, source_name: String) -> Self {
-        Parser { stack: Vec::new(),
-                 stream: Lexer::new(source, source_name)
+impl<I, E, F> Parser<I, E, F>
+            where I: Iterator<Item=Result<char,E>>,
+                  F: Fn(char, LispObj) -> Result<LispObj, Option<LispObj>> {
+    fn try_apply_reader(&self, c: char, obj: LispObj) -> Result<LispObj, ParserError<E>> {
+        match &self.char_handler {
+            &Some(ref handler) => handler(c, obj)
+                .map_err(|err| match err {
+                    Some(err_obj) => ParserError::SpecialCharError(c, err_obj),
+                    None          => ParserError::NoCharHandler(c),
+                }),
+            &None => Err(ParserError::NoCharHandler(c)),
+        }
+    }
+
+    fn push_obj(&mut self, obj: LispObj) -> Option<Result<LispObj, ParserError<E>>> {
+        let c = match self.stack.last_mut() {
+            Some(&mut (ParserState::List, ref mut stack)) => {
+                stack.push(obj);
+                return None
+            },
+            Some(&mut (ParserState::ReaderChar(c), ref mut stack)) => {
+                assert!(stack.len() == 0);
+                c
+            },
+            Some(&mut ref top) => panic!("Parser::push_obj on state {:?}", top),
+            None => return Some(Ok(obj))
+        };
+
+        match self.try_apply_reader(c, obj.clone()) {
+            Ok(res)  => {
+                match self.pop().expect("at least have one character") {
+                    (ParserState::ReaderChar(_), _) => {},
+                    _ => unreachable!()
+                };
+                self.push_obj(res)
+            },
+            Err(err) => {
+                self.stack.clear();
+                Some(Err(err))
+            },
         }
     }
 
@@ -95,6 +161,23 @@ impl<I: Iterator<Item=Result<char,E>>, E> Parser<I, E> {
 
         Ok(vec)
     }
+}
+
+impl<I, E> Parser<I, E>
+        where I: Iterator<Item=Result<char,E>> {
+    pub fn new<S: Into<String>>(source: I, source_name: S) -> Self {
+        Parser { stack: Vec::new(),
+                 stream: Lexer::new(source, source_name.into()),
+                 char_handler: None,
+        }
+    }
+}
+
+impl<I, E, F> Parser<I, E, F> 
+        where I: Iterator<Item=Result<char,E>> {
+    pub fn with_char_handler<FNew>(self, f: FNew) -> Parser<I, E, FNew> {
+        Parser { char_handler: Some(f), stream: self.stream, stack: self.stack }
+    }
 
     pub fn source_name(&self) -> &str {
         &self.stream.source_name
@@ -102,15 +185,6 @@ impl<I: Iterator<Item=Result<char,E>>, E> Parser<I, E> {
 
     fn stack_empty(&self) -> bool {
         self.stack.is_empty()
-    }
-
-    fn push_obj(&mut self, obj: LispObj) -> Option<LispObj> {
-        if let Some(&mut (_, ref mut stack)) = self.stack.last_mut() {
-            stack.push(obj);
-            None
-        } else {
-            Some(obj)
-        }
     }
 
     fn push_state(&mut self, st: ParserState) {
@@ -126,8 +200,9 @@ impl<I: Iterator<Item=Result<char,E>>, E> Parser<I, E> {
     }
 }
 
-impl<I, E> Iterator for Parser<I, E> 
-            where I: Iterator<Item=Result<char,E>> {
+impl<I, E, F> Iterator for Parser<I, E, F> 
+            where I: Iterator<Item=Result<char,E>>,
+                  F: Fn(char, LispObj) -> Result<LispObj, Option<LispObj>> {
     type Item = ParseResult<E>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -149,10 +224,7 @@ impl<I, E> Iterator for Parser<I, E>
             };
 
             match tok.tok {
-                Token::OpenParen => {
-                    self.push_state(ParserState::List);
-                    //return self.next();
-                },
+                Token::OpenParen => self.push_state(ParserState::List),
 
                 Token::CloseParen => {
                     let list = match self.pop() {
@@ -168,45 +240,40 @@ impl<I, E> Iterator for Parser<I, E>
                     };
 
                     match self.push_obj(list) {
-                        Some(obj) => return Some(Ok(obj)),
+                        Some(obj) => return Some(obj),
                         None => {}
                     };
                 },
 
                 Token::Number(n) => {
                     match self.push_obj(int!(n)) {
-                        Some(obj) => return Some(Ok(obj)),
+                        Some(obj) => return Some(obj),
                         None => {}
                     }
                 },
 
                 Token::Float(n) => {
                     match self.push_obj(float!(n)) {
-                        Some(obj) => return Some(Ok(obj)),
+                        Some(obj) => return Some(obj),
                         None => {}
                     }
                 },
 
                 Token::Ident(name) => {
                     match self.push_obj(symbol!(name)) {
-                        Some(obj) => return Some(Ok(obj)),
+                        Some(obj) => return Some(obj),
                         None => {}
                     }
                 },
 
                 Token::QuotedString(string) => {
                     match self.push_obj(string!(string)) {
-                        Some(obj) => return Some(Ok(obj)),
+                        Some(obj) => return Some(obj),
                         None => {}
                     }
                 },
 
-                Token::SpecialChar(c) => {
-                    match self.push_obj(LispObj::LSpecialChar(c)) {
-                        Some(obj) => return Some(Ok(obj)),
-                        None => {}
-                    }
-                }
+                Token::SpecialChar(c) => self.push_state(ParserState::ReaderChar(c)),
             };
         }
     }

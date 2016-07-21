@@ -74,24 +74,8 @@ macro_rules! flatten_list {
             let mut flatten_list_out = vec![];
 
             while let Some((hd, tl)) = flatten_list_tmp.cons_split() {
-                flatten_list_tmp = if hd.is_special_char() {
-                    let ch = hd.unwrap_special_char();
-                    match $env.borrow().get_char_handler(ch) {
-                        Some(handler) => { 
-                            if let Some((arg, tail)) = tl.cons_split() {
-                                let output = try!($crate::evaluator::apply(handler, cons!(arg, nil!()), $env.clone()));
-                                flatten_list_out.push(output.to_obj_ref());
-                                tail
-                            } else {
-                                runtime_error!("reader-error", "no argument to special char: {}", ch)
-                            }
-                        },
-                        None => runtime_error!("reader-error", "no handler for special char: {}", ch)
-                    }
-                } else {
-                    flatten_list_out.push(hd);
-                    tl
-                }
+                flatten_list_out.push(hd);
+                flatten_list_tmp = tl;
             }
 
             if !flatten_list_tmp.is_nil() {
@@ -155,12 +139,6 @@ pub use core::{LispObj, LispObjRef,
                Environment, EnvironmentRef, AsLispObjRef};
 pub use core::{RuntimeError, EvalResult};
 
-/******************** Global evaluator type **************/
-
-pub struct Evaluator {
-    global: Environment
-}
-
 /******************** Environment Utilities ************************/
 
 pub fn default_environment() -> Environment {
@@ -208,27 +186,8 @@ pub fn eval_all<It, Obj>(forms: It, env: EnvironmentRef) -> Result<Vec<LispObj>,
 pub fn map_eval(ls: LispObjRef, env: EnvironmentRef) -> EvalResult {
     if ls.is_nil() {
         Ok(nil!())
-    } else if let Some((hd, mut tl)) = ls.cons_split() {
-        let this = {
-            if hd.is_special_char() {
-                let ch = hd.unwrap_special_char();
-                match env.borrow().get_char_handler(ch) {
-                    Some(handler) => { 
-                        if let Some((arg, tail)) = tl.cons_split() {
-                            let output = try!(apply(handler, cons!(arg, nil!()), env.clone()));
-                            tl = tail;
-                            try!(eval(output, env.clone()))
-                        } else {
-                            runtime_error!("reader-error", "no argument to special char: {}", ch)
-                        }
-                    },
-                    None => runtime_error!("reader-error", "no handler for special char: {}", ch)
-                }
-            } else {
-                try!(eval(hd, env.clone()))
-            }
-        };
-
+    } else if let Some((hd, tl)) = ls.cons_split() {
+        let this = try!(eval(hd, env.clone()));
         let rest = try!(map_eval(tl, env));
         Ok(cons!(this, rest))
     } else {

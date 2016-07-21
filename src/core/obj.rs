@@ -64,9 +64,11 @@ pub enum LispObj {
     // and are used for reader macros
     LSpecialChar(char),
 
+    /*
     /// Various parser types
     LParserFileStream(Rc<RefCell<parser::Parser<io::Chars<fs::File>, io::CharsError>>>),
     LParserFromString(Rc<RefCell<parser::Parser<parser::StringIter, ()>>>),
+    */
 }
 
 impl PartialEq for LispObj {
@@ -228,8 +230,10 @@ impl Display for LispObj {
             &LError(ref err)    => write!(fmt, "{}", err),
             &LSpecialChar(ref c) 
                                 => write!(fmt, "{}", c),
+                                /*
             &LParserFileStream(ref stream) => write!(fmt, "<parser-stream:{}>", stream.borrow().source_name()),
             &LParserFromString(ref stream) => write!(fmt, "<parser-stream:{}>", stream.borrow().source_name()),
+            */
         }
     }
 }
@@ -353,6 +357,7 @@ impl LispObj {
         }
     }
 
+    /*
     pub fn parser_next(&self) -> Result<Option<Result<LispObj, parser::ParserError<String>>>, ()> {
         match self {
             &LParserFileStream(ref stream) => Ok(stream.borrow_mut().next().map(|res| res.map_err(|err| err.map_string()))),
@@ -360,6 +365,7 @@ impl LispObj {
             _ => Err(()),
         }
     }
+    */
 
     pub fn unwrap_symbol(self) -> String {
         match self {
@@ -492,6 +498,7 @@ impl LispObj {
         }
     }
 
+    /*
     pub fn is_parser(&self) -> bool {
         match self {
             &LParserFileStream(_) => true,
@@ -499,6 +506,7 @@ impl LispObj {
             _ => false,
         }
     }
+    */
 
     pub fn car(&self) -> Option<LispObjRef> {
         match self {
