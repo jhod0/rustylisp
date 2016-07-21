@@ -18,27 +18,30 @@ use super::EvalResult;
 //  Absolute equality:  eq?
 
 /// Native functions defined in the default lisp namespace
-pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature)] = 
-    &[("+", add), ("-", sub), ("*", product), ("/", division),
+pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature)] = &[
+    ("+", add), ("-", sub), ("*", product), ("/", division),
 
-      ("apply", apply), ("eval", eval),
+    // Meta
+    ("apply", apply), ("eval", eval), ("macro-expand", macro_expand),
 
-      // Predicates
-      ("bound?", is_bound), ("cons?", is_cons), ("nil?", is_nil),
-      ("symbol?", is_symbol), ("string?", is_string),
+    // Predicates
+    ("bound?", is_bound), ("cons?", is_cons), ("nil?", is_nil),
+    ("symbol?", is_symbol), ("string?", is_string),
 
+    // Conversion
+    ("string->list", string_to_list),
+    ("string->symbol", string_to_symbol),
+    ("symbol->char", symbol_to_char),
+    ("symbol->string", symbol_to_string),
 
-      // Conversion
-      ("string->list", string_to_list),
-      ("string->symbol", string_to_symbol),
-      ("symbol->char", symbol_to_char),
-      ("symbol->string", symbol_to_string),
+    // Manipulation
+    ("car", car), ("cdr", cdr), ("cons", cons),
 
-       // Manipulation
-      ("car", car), ("cdr", cdr), ("cons", cons),
+    // I/O
+    ("load-file", io::load_file_handler),
+    ("read", io::read_handler),
+];
 
-      ("load-file", io::load_file),
-      ("macro-expand", macro_expand)];
 
 /// Builtin values defined in the default lisp namespace.
 ///

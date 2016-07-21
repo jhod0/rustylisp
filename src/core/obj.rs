@@ -1,10 +1,7 @@
-use std::cell::RefCell; 
 use std::fmt::{self, Display};
-use std::{fs, io};
 use std::rc::Rc;
 
 pub use ::evaluator::EvalResult;
-use ::parser;
 use super::EnvironmentRef;
 use self::LispObj::*;
 
@@ -20,12 +17,24 @@ pub struct ArityObj {
     pub rest: Option<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Procedure {
     pub env: EnvironmentRef,
     pub name: Option<String>,
     documentation: Option<String>,
     pub body: Vec<(ArityObj, Vec<LispObjRef>)>,
+}
+
+impl fmt::Debug for Procedure {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let body_as_string: Vec<(_, Vec<String>)> = self.body.iter().map(|&(ref ar, ref body)| {
+            (ar, body.iter().map(|obj| format!("{}", obj)).collect())
+        }).collect();
+        fmt.debug_struct("Procedure")
+           .field("name", &self.name)
+           .field("body", &body_as_string)
+           .finish()
+    }
 }
 
 /// A type which represents Lisp objects.
@@ -169,7 +178,7 @@ impl Display for LispObj {
             &LInteger(ref me)   => write!(fmt, "{}", me),
             &LFloat(ref me)     => write!(fmt, "{}", me),
             &LString(ref me)    => write!(fmt, "\"{}\"", me),
-            &LSymbol(ref me)    => write!(fmt, "'{}", me),
+            &LSymbol(ref me)    => write!(fmt, "{}", me),
             &LChar(ref me)      => {
                 match *me {
                     ' '  => write!(fmt, "\\space"),

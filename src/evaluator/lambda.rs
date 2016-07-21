@@ -1,5 +1,7 @@
 //! Utilities for working with lisp procedures, both for creation and execution.
 
+use std::rc::Rc;
+
 use ::core::EvalResult;
 use ::core::obj::{ArityObj, Procedure};
 use ::core::{LispObj, LispObjRef, AsLispObjRef,
@@ -18,33 +20,42 @@ pub fn lambda_apply(func: &Procedure, arg: LispObjRef) -> EvalResult {
     let (mut env, mut last_to_eval) = try!(lambda_apply_until_last(func, arg));
 
     match func.name {
+        // If it is a named function, attempt TCO
         Some(ref fname) => {
-            // let mut lvl = 0;
             loop {
-                // println!("application of {}: lvl {}", fname, lvl);
-                // println!("\targ = {}", last_to_eval);
-
                 let (new_env, new_lte) = match last_to_eval.cons_split() {
                     Some((hd, tl)) => {
+
                         if hd.is_symbol() {
                             if fname == hd.symbol_ref().unwrap() {
+                                // Tail call, perform tco!
                                 let args = try!(super::map_eval(tl, env.clone()));
-                                try!(lambda_apply_until_last(func, args.to_obj_ref()))
+                                /* Reuse environment if possible */
+                                match Rc::try_unwrap(env) {
+                                    Ok(new_env) => {
+                                        try!(lambda_apply_until_last_from(func, args.to_obj_ref(), new_env.into_inner()))
+                                    },
+                                    Err(_) => try!(lambda_apply_until_last(func, args.to_obj_ref()))
+                                }
                             } else {
+                                // Non-tail call, vanilla eval
                                 return super::eval(last_to_eval, env)
                             }
+
                         } else {
+                            // Non-tail call, vanilla eval
                             return super::eval(last_to_eval, env)
                         }
                     },
+                    // Non-call
                     None => return super::eval(last_to_eval, env)
                 };
                 env = new_env; 
                 last_to_eval = new_lte;
-
-                // lvl += 1;
             }
         },
+
+        // Else, vanilla eval
         None => super::eval(last_to_eval, env)
     }
 }
@@ -55,58 +66,49 @@ pub fn lambda_apply_until_last(func: &Procedure, arg: LispObjRef) -> EvalResult<
     super::tco::special_form_tco_until_last("begin", body, env.to_env_ref())
 }
 
+fn lambda_apply_until_last_from(func: &Procedure, arg: LispObjRef, env: Environment) -> EvalResult<(EnvironmentRef, LispObj)> {
+    let (env, body) = try!(start_procedure_from(func, arg, env));
+    super::tco::special_form_tco_until_last("begin", body, env.to_env_ref())
+}
+
 pub fn start_procedure(procd: &Procedure, args: LispObjRef) -> EvalResult<(Environment, &[LispObjRef])> {
+    let new_env = Environment::from_parent(procd.env.clone());
+    start_procedure_from(procd, args, new_env)
+}
+
+fn start_procedure_from(procd: &Procedure, args: LispObjRef, mut reuse_env: Environment) -> EvalResult<(Environment, &[LispObjRef])> {
     assert!(procd.body.len() > 0, "Procedure needs at least 1 body");
 
     for i in 0..(procd.body.len()-1) {
-        let env = match parse_args(&procd.body[i].0, args.clone(), procd.env.clone()) {
-            Ok(env) => env,
+        match parse_args_into(&procd.body[i].0, args.clone(), &mut reuse_env) {
+            Ok(()) => {},
             Err(_) => continue,
-        };
+        }
 
-        return Ok((env, &procd.body[i].1))
+        return Ok((reuse_env, &procd.body[i].1))
     }
 
     let last = procd.body.len() - 1;
-    let env = try!(parse_args(&procd.body[last].0, args, procd.env.clone()));
-    Ok((env, &procd.body[last].1))
+    try!(parse_args_into(&procd.body[last].0, args, &mut reuse_env));
+    Ok((reuse_env, &procd.body[last].1))
 }
 
 /// Attempts to parse to a list based on the an arity object, creating a new environment.
-///
-/// # Examples
-///
-/// ```
-/// # #[macro_use] extern crate rustylisp;
-/// # pub fn main() {
-/// use rustylisp::core::obj::ArityObj;
-/// use rustylisp::core::{LispObj, LispObjRef, AsLispObjRef, Environment};
-/// use rustylisp::evaluator::lambda::parse_args;
-///
-/// // Create an ArityObj for a lambda of the form
-/// // (lambda (a b c) ...)
-/// let first_arity = ArityObj::new(["a", "b", "c"].iter()
-///                                 .map(|s| String::from(*s)).collect(), 
-///                             None);
-/// let env = Environment::empty().to_env_ref();
-///
-/// // Apply it to (1 2 3)
-/// let args = cons!(int!(1), cons!(int!(2), cons!(int!(3), nil!()))).to_obj_ref();
-/// let parsed = parse_args(&first_arity, args, env.clone()).unwrap();
-///
-/// // So, the environment should be a = 1, b = 2, c = 3
-/// for &(name, val) in [("a", 1), ("b", 2), ("c", 3)].iter() {
-///     assert_eq!(parsed.lookup(&String::from(name)), Some(int!(val).to_obj_ref()))
-/// }
-/// # }
-/// ```
-pub fn parse_args(arity: &ArityObj, mut args: LispObjRef, env: EnvironmentRef) -> EvalResult<Environment> {
+pub fn parse_args(arity: &ArityObj, args: LispObjRef, env: EnvironmentRef) -> EvalResult<Environment> {
     let mut new_env = Environment::from_parent(env);
+    try!(parse_args_into(arity, args, &mut new_env));
+    Ok(new_env)
+}
+
+/// Attempts to parse an argument list into an existing environment, based on an arity object.
+/// Clears the input environment before loading new names.
+pub fn parse_args_into<'a>(arity: &ArityObj, mut args: LispObjRef, env: &'a mut Environment) -> EvalResult<()> {
+    env.clear_bindings();
 
     for (ind, name) in arity.argnames.iter().enumerate() {
         args = match args.cons_split() {
             Some((hd, tl)) => {
-                assert!(new_env.let_new(name.clone(), hd).is_none());
+                assert!(env.let_new(name.clone(), hd).is_none());
                 tl
             },
             None => arity_error!("Too few args: expecting {}, got {}", arity.argnames.len(), ind),
@@ -115,18 +117,19 @@ pub fn parse_args(arity: &ArityObj, mut args: LispObjRef, env: EnvironmentRef) -
 
     match arity.rest {
         Some(ref rest_name) => {
-            assert!(new_env.let_new(rest_name.clone(), args).is_none());
-            Ok(new_env)
+            assert!(env.let_new(rest_name.clone(), args).is_none());
+            Ok(())
         },
         None => {
             if args.is_nil() {
-                Ok(new_env)
+                Ok(())
             } else {
                 arity_error!("Extra args: {}", args)
             }
         },
     }
 }
+
 
 /*************************** Procedure Creation ******************************/
 

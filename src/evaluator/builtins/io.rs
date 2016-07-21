@@ -1,8 +1,10 @@
+use std::io::{self, Read};
+
 use ::core::{env, LispObjRef, AsLispObjRef, EnvironmentRef};
 use ::parser::Parser;
 use ::evaluator::{self, EvalResult};
 
-pub fn load_file(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+pub fn load_file_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => file_path: LString);
 
     let global = env::get_top_level(env);
@@ -22,4 +24,13 @@ pub fn load_file(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     }
 
     Ok(out)
+}
+
+pub fn read_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    let mut instream = Parser::new(io::stdin().chars(), "<stdin>");
+    match instream.next() {
+        Some(Ok(obj))   => Ok(obj),
+        Some(Err(err))  => read_error!("{:?}", err),
+        None            => read_error!("end of input"),
+    }
 }

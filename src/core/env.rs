@@ -86,6 +86,12 @@ impl Environment {
         self.parent.is_none()
     }
 
+    pub fn clear_bindings(&mut self) {
+        self.bindings.clear();
+        self.macros = None;
+        self.special_chars = None;
+    }
+
     // TODO Only sets char handler in this environment - should it be set in parent
     // environment?
     pub fn set_char_handler(&mut self, name: char, value: LispObjRef) -> Option<LispObjRef> {

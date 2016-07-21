@@ -62,7 +62,7 @@ impl Evaluator {
         for item in stream.with_char_handler(|c, obj| self.handle_char(c, obj)) {
             out = match item {
                 Ok(obj)     => try!(evaluator::eval(obj, self.top_level.clone())),
-                Err(err)    => runtime_error!("read-error", "{:?}", err),
+                Err(err)    => read_error!("{:?}", err),
             };
         }
         Ok(out)

@@ -51,6 +51,13 @@ macro_rules! macro_error {
 }
 
 #[macro_export]
+macro_rules! read_error {
+    ( $( $msg:expr ),* ) => {
+        runtime_error!( $crate::evaluator::err_msgs::SYNTAX_ERROR  $(, $msg )* )
+    }
+}
+
+#[macro_export]
 macro_rules! redefine_error {
     ( cause $cause:expr; $( $msg:expr ),* ) => {
         runtime_error!( cause $cause; $crate::evaluator::err_msgs::REDEFINE_ERROR  $(, $msg )* )
@@ -81,6 +88,7 @@ pub static BOUND_ERROR:         &'static str = "bound-error";
 pub static INTERNAL_ERROR:      &'static str = "internal-error";
 pub static IO_ERROR:            &'static str = "io-error";
 pub static MACRO_ERROR:         &'static str = "macro-expansion-error";
+pub static READ_ERROR:          &'static str = "read-error";
 pub static REDEFINE_ERROR:      &'static str = "redefine-error";
 pub static SYNTAX_ERROR:        &'static str = "syntax-error";
 pub static TYPE_ERROR:          &'static str = "type-error";
