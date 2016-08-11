@@ -79,7 +79,7 @@ pub fn special_form_tco_until_last(form_name: &str, initial_args: &[LispObjRef],
             Some((hd, tl)) => { 
                 if let Some(s) = hd.symbol_ref() {
                     if let Ok(ind) = TCO_BUILTINS.binary_search(&s.as_str()) {
-                        let vec = flatten_list!(env env; tl, "ill-formed-list");
+                        let vec = flatten_list!(tl, "ill-formed-list");
                         (TCO_BUILTINS[ind], vec)
                     } else {
                         /* TODO check if s is macro,
@@ -142,11 +142,11 @@ pub fn let_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult<(E
         syntax_error!("let must have bindings");
     }
 
-    let bindings = flatten_list!(env env; args[0].clone(), "malformed bindings list");
+    let bindings = flatten_list!(args[0].clone(), "malformed bindings list");
 
     /* TODO named let */
     for binding in bindings.into_iter() {
-        let unwrapped = flatten_list!(env env; binding, "malformed binding");
+        let unwrapped = flatten_list!(binding, "malformed binding");
 
         unpack_args!(unwrapped => name: Any, value: Any);
         if !name.is_symbol() {

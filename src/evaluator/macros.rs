@@ -33,13 +33,24 @@ pub fn try_macro_expand(macro_name: &String, args: LispObjRef, env: EnvironmentR
 /***************** Special Character Handlers ****************/
 
 pub static SPECIAL_CHAR_DEFAULTS: &'static [(char, NativeFuncSignature)] = 
-    &[('\'', quote_handler), ('\\', backslash_handler)];
+    &[('\'', quote_handler), ('\\', backslash_handler), 
+      ('`', quasiquote_handler), (',', unquote_handler)];
 
 fn backslash_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     super::builtins::symbol_to_char(args, env)
 }
 
+fn quasiquote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: Any);
+    Ok(cons!(symbol!("quasiquote"), cons!(arg, nil!())))
+}
+
 fn quote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
     Ok(quote!(arg))
+}
+
+fn unquote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: Any);
+    Ok(cons!(symbol!("unquote"), cons!(arg, nil!())))
 }

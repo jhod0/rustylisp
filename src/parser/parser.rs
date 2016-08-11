@@ -27,7 +27,7 @@ pub enum ParserState {
     Idle, ReaderChar(char), List,
 }
 
-pub struct DummyFn;
+pub type DummyFn = fn(char, LispObj) -> Result<LispObj, Option<LispObj>>;
 
 #[must_use]
 pub struct Parser<I, E, F=DummyFn> 
@@ -53,25 +53,6 @@ impl<E: fmt::Debug> ParserError<E> {
             ParserError::LexError(err) 
                 => ParserError::LexError(LexError::ReadError(format!("{:?}", err))),
         }
-    }
-}
-
-impl FnOnce<(char, LispObj)> for DummyFn {
-    type Output = Result<LispObj, Option<LispObj>>;
-    extern "rust-call" fn call_once(self, _: (char, LispObj)) -> Self::Output {
-        unreachable!("called null-struct DummyFn")
-    }
-}
-
-impl FnMut<(char, LispObj)> for DummyFn {
-    extern "rust-call" fn call_mut(&mut self, _: (char, LispObj)) -> Self::Output {
-        unreachable!("called null-struct DummyFn")
-    }
-}
-
-impl Fn<(char, LispObj)> for DummyFn {
-    extern "rust-call" fn call(&self, _: (char, LispObj)) -> Self::Output {
-        unreachable!("called null-struct DummyFn")
     }
 }
 

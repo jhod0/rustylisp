@@ -21,7 +21,7 @@ pub struct ArityObj {
 pub struct Procedure {
     pub env: EnvironmentRef,
     pub name: Option<String>,
-    documentation: Option<String>,
+    pub documentation: Option<String>,
     pub body: Vec<(ArityObj, Vec<LispObjRef>)>,
 }
 
@@ -59,6 +59,7 @@ pub enum LispObj {
     LVector(Vec<LispObjRef>),
 
     /// A function implemented in Rust
+    /// LNativeFunc(name, documentation, func)
     LNativeFunc(String, Option<Rc<String>>, NativeFunc),
 
     /// A function
@@ -159,13 +160,13 @@ impl Procedure {
         self.name = Some(name);
     }
 
-    pub fn with_doc(mut self, doc: String) -> Self {
-        self.set_doc(doc);
+    pub fn with_doc<S: Into<String>>(mut self, doc: S) -> Self {
+        self.set_doc(doc.into());
         self
     }
 
-    pub fn with_name(mut self, name: String) -> Self {
-        self.set_name(name);
+    pub fn with_name<S: Into<String>>(mut self, name: S) -> Self {
+        self.set_name(name.into());
         self
     }
 }
@@ -362,6 +363,13 @@ impl LispObj {
     pub fn symbol_ref(&self) -> Option<&String> {
         match self {
             &LSymbol(ref s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn string_ref(&self) -> Option<&str> {
+        match self {
+            &LString(ref s) => Some(&*s),
             _ => None,
         }
     }

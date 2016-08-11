@@ -13,21 +13,22 @@ use super::eval;
  *
  * TODO get more versatile error handling policy
  *
- * and          - yes
- * begin        - yes
- * case-lambda  - yes
- * catch-error  - yes
- * define       - yes
- * define-macro - partial - need multiple-arity
+ * and                  - yes
+ * begin                - yes
+ * case-lambda          - yes
+ * catch-error          - yes
+ * define               - yes
+ * define-macro         - partial - need multiple-arity
+ * define-char-handler
  * gensym
- * if           - yes
- * let          - partial, need named let
- * lambda       - yes
+ * if                   - yes
+ * let                  - partial, need named let
+ * lambda               - yes
  * modify!
- * or           - yes
- * quote        - yes
+ * or                   - yes
+ * quote                - yes
  * quasiquote
- * set!         - yes
+ * set!                 - yes
  */
 
 pub fn get_handler(s: &str) -> Option<NativeFuncSignature> {
@@ -40,6 +41,7 @@ pub fn get_handler(s: &str) -> Option<NativeFuncSignature> {
     None
 }
 
+// TODO make scheme for documentation
 static HANDLERS: &'static [(&'static str, NativeFuncSignature)] =
       &[("and", and_handler), ("begin", begin_handler), ("case-lambda", case_lambda_handler), ("catch-error", catch_error_handler),  
         ("define", define_handler), ("define-macro", define_macro_handler),
@@ -181,7 +183,7 @@ pub fn quote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     if args.len() == 1 {
         Ok((*args[0]).clone())
     } else {
-        syntax_error!("wrong number of arguments to quote")
+        syntax_error!("wrong number of arguments to quote: {}", LispObj::to_lisp_list(args.iter()))
     }
 }
 

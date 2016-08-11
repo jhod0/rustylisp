@@ -2,8 +2,8 @@
 use std::fmt;
 use std::io::{self, Read};
 
-use super::core::{LispObj, AsLispObjRef, Environment, EnvironmentRef, EvalResult};
-use super::parser::{self, Lexer, Parser};
+use super::core::{LispObj, AsLispObjRef, /* Environment, */ EnvironmentRef, EvalResult};
+use super::parser::{self, /* Lexer, */ Parser};
 use super::evaluator;
 
 pub struct Evaluator {

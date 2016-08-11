@@ -6,40 +6,47 @@
 //! Check BUILTIN_FUNCS to be sure.
 mod io;
 
+use std::convert::AsRef;
+
 use ::core::{LispObj, LispObjRef, AsLispObjRef, EnvironmentRef};
-use ::core::obj::NativeFuncSignature;
+use ::core::obj::{NativeFuncSignature, Procedure};
 use super::EvalResult;
 
 // TODO add documentation for functions
 //
 // TODO functions:
 //  Numeric comparison: =, <=, >=, <, >
-//  Documentation func: doc
 //  Absolute equality:  eq?
 
 /// Native functions defined in the default lisp namespace
-pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature)] = &[
-    ("+", add), ("-", sub), ("*", product), ("/", division),
+pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&'static str>)] = &[
+    // Arithmetic
+    ("+", add, Some(ADD_DOCSTR)), ("-", sub, Some(SUB_DOCSTR)), 
+    ("*", product, Some(PRODUCT_DOCSTR)), ("/", division, None),
 
     // Meta
-    ("apply", apply), ("eval", eval), ("macro-expand", macro_expand),
+    ("apply", apply, None), ("doc", doc, None), ("eval", eval, None), ("macro-expand", macro_expand, None),
 
     // Predicates
-    ("bound?", is_bound), ("cons?", is_cons), ("nil?", is_nil),
-    ("symbol?", is_symbol), ("string?", is_string),
+    ("bound?", is_bound, None), ("cons?", is_cons, None), ("nil?", is_nil, None),
+    ("symbol?", is_symbol, None), ("string?", is_string, None),
+
+    ("string", string_append_objects, None),
 
     // Conversion
-    ("string->list", string_to_list),
-    ("string->symbol", string_to_symbol),
-    ("symbol->char", symbol_to_char),
-    ("symbol->string", symbol_to_string),
+    ("string->list", string_to_list, None),
+    ("string->symbol", string_to_symbol, None),
+    ("symbol->char", symbol_to_char, None),
+    ("symbol->string", symbol_to_string, None),
 
     // Manipulation
-    ("car", car), ("cdr", cdr), ("cons", cons),
+    ("car", car, None), ("cdr", cdr, None), ("cons", cons, None),
 
     // I/O
-    ("load-file", io::load_file_handler),
-    ("read", io::read_handler),
+    ("load-file", io::load_file_handler, None),
+    ("print", io::print, None),
+    ("println", io::println, None),
+    ("read", io::read_handler, None),
 ];
 
 
@@ -126,7 +133,14 @@ fn sub_two(a: LispObj, b: LispObj) -> EvalResult {
     }
 }
 
+const ADD_DOCSTR: &'static str = "Performs addition.
 
+Throws a 'type-error if any arguments are not numbers.
+
+Examples:
+
+(+ 1 2 3)
+=> 6";
 pub fn add(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     let mut out = int!(0);
 
@@ -158,6 +172,19 @@ pub fn division(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     }
 }
 
+pub fn doc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => obj: Any);
+
+    match (*obj).clone() {
+        LispObj::LNativeFunc(_, Some(ref docstr), _) => {
+            Ok(string!(docstr.as_ref().clone()))
+        },
+        LispObj::LProcedure(Procedure { documentation: Some(ref docstr), ..}) => {
+            Ok(string!(docstr.clone()))
+        },
+        _ => Ok(lisp_false!())
+    }
+}
 
 pub fn is_bound(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => name: LSymbol);
@@ -216,6 +243,17 @@ pub fn macro_expand(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     }
 }
 
+const PRODUCT_DOCSTR: &'static str = "Performs multiplication.
+
+Throws a type-error if an argument is not a number.
+
+Examples:
+
+(*)
+;; => 1
+
+(* 1 2 3 4)
+;; => 12";
 pub fn product(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     let mut out = int!(1);
 
@@ -224,6 +262,16 @@ pub fn product(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     }
 
     Ok(out)
+}
+
+pub fn string_append_objects(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    let mut out = String::new();
+
+    for obj in args.iter() {
+        out.push_str(&format!("{}", obj));
+    }
+
+    Ok(string!(out))
 }
 
 pub fn string_to_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -237,6 +285,25 @@ pub fn string_to_symbol(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     Ok(symbol!(string))
 }
 
+const SUB_DOCSTR: &'static str = "Performs subtraction.
+
+Throws a type-error if an argument is not a number.
+
+(- a b c d e ...)
+is equivalent to:
+(- a (+ b c d e ...))
+
+(- a)
+is equivalent to:
+(- 0 a)
+
+Examples:
+
+(- 5 3)
+=> 2
+
+(- 10 1 2 3 4)
+=> 0";
 pub fn sub(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     if args.len() == 0 {
         arity_error!("(-) must have at least one argument")

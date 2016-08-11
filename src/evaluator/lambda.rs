@@ -93,6 +93,7 @@ fn start_procedure_from(procd: &Procedure, args: LispObjRef, mut reuse_env: Envi
     Ok((reuse_env, &procd.body[last].1))
 }
 
+#[allow(dead_code)]
 /// Attempts to parse to a list based on the an arity object, creating a new environment.
 pub fn parse_args(arity: &ArityObj, args: LispObjRef, env: EnvironmentRef) -> EvalResult<Environment> {
     let mut new_env = Environment::from_parent(env);
@@ -154,21 +155,28 @@ pub fn parse_lambda(input: &[LispObjRef], parent: EnvironmentRef) -> EvalResult<
 pub fn parse_multiple_arity(args: &[LispObjRef], parent: EnvironmentRef) -> EvalResult<Procedure> {
     let mut clauses = vec![];
 
-    for clause in args.iter() {
+    let docstr = args[0].string_ref();
+
+    for clause in args.iter().skip(if docstr.is_none() {0} else {1}) {
         clauses.push(try!(parse_arglist_body(clause.clone(), parent.clone())));
     }
 
+    // And parse the lambda itself
     if clauses.is_empty() {
         syntax_error!("(case-lambda) must contain at least one clause")
     } else {
-        Ok(Procedure::multiple_arity(parent, clauses))
+        let procd = Procedure::multiple_arity(parent, clauses);
+        match docstr {
+            Some(s) => Ok(procd.with_doc(s)),
+            None => Ok(procd),
+        }
     }
 }
 
-fn parse_arglist_body(args: LispObjRef, env: EnvironmentRef) -> EvalResult<(ArityObj, Vec<LispObjRef>)> {
+fn parse_arglist_body(args: LispObjRef, _: EnvironmentRef) -> EvalResult<(ArityObj, Vec<LispObjRef>)> {
     if let Some((hd, tl)) = args.cons_split() {
         let arity = try!(parse_arglist(hd));
-        let body = flatten_list!(env env; tl, "poorly-formed function body");
+        let body = flatten_list!(tl, "poorly-formed function body");
         Ok((arity, body))
     } else {
         syntax_error!("invalid lambda expression: {}", cons!(symbol!("lambda"), args))

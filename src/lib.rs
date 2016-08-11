@@ -1,8 +1,6 @@
 #![feature(io)]
 #![feature(range_contains)]
 #![feature(inclusive_range_syntax)]
-#![feature(unboxed_closures)]
-#![feature(fn_traits)]
 
 // This order is important, core's macros are used in parser
 // and evaluator...

@@ -68,7 +68,7 @@ macro_rules! check_type {
 ///
 /// See module `err_msgs` for more on errors.
 macro_rules! flatten_list {
-    ( env $env:expr; $val:expr, $( $msg:expr ),+ ) => {
+    ( $val:expr, $( $msg:expr ),+ ) => {
         {
             let mut flatten_list_tmp = $val.clone();
             let mut flatten_list_out = vec![];
@@ -143,8 +143,8 @@ pub use core::{RuntimeError, EvalResult};
 
 pub fn default_environment() -> Environment {
     let bindings = builtins::BUILTIN_FUNCS.iter()
-                .map(|&(ref name, ref func)| {
-                    (String::from(*name), LispObj::make_native(*name, *func, None).to_obj_ref())
+                .map(|&(ref name, ref func, ref doc)| {
+                    (String::from(*name), LispObj::make_native(*name, *func, *doc).to_obj_ref())
                 })
                 .chain(builtins::builtin_vals().into_iter()
                     .map(|(name, obj)| (String::from(name), obj.to_obj_ref()))
@@ -221,7 +221,7 @@ pub fn eval<Obj>(form_input: Obj, env: EnvironmentRef) -> EvalResult
                // Try special form
                match special_form_handlers::get_handler(s) {
                    Some(handler) => {
-                       let tl_vec = flatten_list!(env env; tl, "({}) invalid syntax (ill-formed arg list)", s);
+                       let tl_vec = flatten_list!(tl, "({}) invalid syntax (ill-formed arg list)", s);
                        return handler(&tl_vec, env)
                    },
                    None => {},
@@ -253,7 +253,7 @@ pub fn apply<Obj1, Obj2>(proc_input: Obj1, arg_input: Obj2, env: EnvironmentRef)
     let arg = arg_input.to_obj_ref();
 
     if procedure.is_native() {
-        let args = flatten_list!(env env; arg.clone(), "(apply) ill-formed argument list");
+        let args = flatten_list!(arg.clone(), "(apply) ill-formed argument list");
         match (*procedure).clone().unwrap_native()(&args, env) {
             Ok(obj) => Ok(obj),
             Err(err) => {

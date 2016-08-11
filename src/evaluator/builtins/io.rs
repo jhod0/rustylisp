@@ -1,6 +1,7 @@
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
+use std::convert::AsRef;
 
-use ::core::{env, LispObjRef, AsLispObjRef, EnvironmentRef};
+use ::core::{env, LispObj, LispObjRef, AsLispObjRef, EnvironmentRef};
 use ::parser::Parser;
 use ::evaluator::{self, EvalResult};
 
@@ -26,11 +27,54 @@ pub fn load_file_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult
     Ok(out)
 }
 
-pub fn read_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
-    let mut instream = Parser::new(io::stdin().chars(), "<stdin>");
-    match instream.next() {
+pub fn print(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    for arg in args.iter() {
+        match arg.as_ref() {
+            &LispObj::LString(ref s) => print!("{}", s),
+            other => print!("{}", other),
+        }
+    }
+
+    match io::stdout().flush() {
+        Ok(_) => {}
+        Err(err) => io_error!("{:?}", err)
+    }
+
+    Ok(lisp_true!())
+}
+
+pub fn println(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    let _ = try!(print(args, env));
+    println!("");
+
+    match io::stdout().flush() {
+        Ok(_) => {}
+        Err(err) => io_error!("{:?}", err)
+    }
+
+    Ok(lisp_true!())
+}
+
+/// TODO handle special chars
+pub fn read_handler(_: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    let instream = Parser::new(io::stdin().chars(), "<stdin>");
+    let top_level = env::get_top_level(env);
+
+    let char_handler = |c, obj| {
+        match top_level.borrow().get_char_handler(c) {
+            Some(handler) => {
+                evaluator::apply(handler, cons!(obj, nil!()), top_level.clone())
+                           .map_err(|err| Some(err.into_lisp_obj()))
+            },
+            None => Err(None),
+        }
+    };
+
+    match instream.with_char_handler(char_handler).next() {
         Some(Ok(obj))   => Ok(obj),
         Some(Err(err))  => read_error!("{:?}", err),
         None            => read_error!("end of input"),
     }
 }
+
+//pub fn 

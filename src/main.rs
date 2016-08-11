@@ -1,10 +1,7 @@
-#![feature(io)]
 extern crate rustylisp;
 use rustylisp::run;
 
-use std::io::{self, Read};
 use std::env;
-use std::fmt::Debug;
 
 fn main() {
     let args: Vec<_> = env::args().collect();

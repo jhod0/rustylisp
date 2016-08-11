@@ -15,10 +15,10 @@ pub struct RuntimeError {
 }
 
 impl RuntimeError {
-    pub fn new<S>(msg: S, val: Option<LispObjRef>, cause: Option<RuntimeError>, source: Option<LispObjRef>) -> Self 
+    pub fn new<S>(errtype: S, val: Option<LispObjRef>, cause: Option<RuntimeError>, source: Option<LispObjRef>) -> Self 
                 where S: Into<String> {
         RuntimeError {
-            errname: msg.into(), value: val, 
+            errname: errtype.into(), value: val, 
             cause: cause.map(Box::new), source: source
         }
     }
