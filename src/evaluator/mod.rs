@@ -163,10 +163,12 @@ pub fn default_environment() -> Environment {
 
 fn is_self_evaluating(obj: LispObjRef) -> bool {
     match *obj {
-        LispObj::LInteger(_)    => true,
-        LispObj::LFloat(_)      => true,
-        LispObj::LString(_)     => true,
-        LispObj::LNil           => true,
+        LispObj::LInteger(_)        => true,
+        LispObj::LFloat(_)          => true,
+        LispObj::LString(_)         => true,
+        LispObj::LNil               => true,
+//        LispObj::LProcedure(_)      => true,
+//        LispObj::LNativeFunc(_,_,_) => true,
         _ => false,
     }
 }

@@ -21,6 +21,7 @@ pub struct ArityObj {
 pub struct Procedure {
     pub env: EnvironmentRef,
     pub name: Option<String>,
+    pub id: u32,
     pub documentation: Option<String>,
     pub body: Vec<(ArityObj, Vec<LispObjRef>)>,
 }
@@ -140,8 +141,10 @@ impl Procedure {
     pub fn new(env: EnvironmentRef, name: Option<String>,
                doc: Option<String>, body: Vec<(ArityObj, Vec<LispObjRef>)>) -> Procedure {
         assert!(body.len() > 0);
+        let id = env.borrow_mut().next_procedure_id();
         Procedure {
             env: env, name: name,
+            id: id,
             documentation: doc, body: body
         }
     }
@@ -377,6 +380,13 @@ impl LispObj {
         match self {
             &LString(ref s) => Some(&*s),
             _ => None,
+        }
+    }
+
+    pub fn procedure_id(&self) -> Option<u32> {
+        match self {
+            &LProcedure(ref p) => Some(p.id),
+            _ => None
         }
     }
 

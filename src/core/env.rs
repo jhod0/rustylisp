@@ -18,6 +18,7 @@ pub type EnvironmentRef = Rc<RefCell<Environment>>;
 pub struct Environment {
     parent: Option<EnvironmentRef>,
     bindings: HashMap<String, LispObjRef>,
+    max_procedure_id: u32,
     // These are Options so that they are not allocated unless
     // they are really needed
     macros: Option<HashMap<String, LispObjRef>>,
@@ -33,10 +34,11 @@ impl Default for Environment {
 impl Environment {
     pub fn new() -> Self {
         Environment {
-            parent:         None,
-            bindings:       HashMap::new(),
-            macros:         None,
-            special_chars:  None,
+            parent:             None,
+            bindings:           HashMap::new(),
+            max_procedure_id:   0,
+            macros:             None,
+            special_chars:      None,
         }
     }
 
@@ -90,6 +92,19 @@ impl Environment {
         self.bindings.clear();
         self.macros = None;
         self.special_chars = None;
+    }
+
+    pub fn next_procedure_id(&mut self) -> u32 {
+        match self.parent {
+            Some(ref par) => {
+                par.borrow_mut().next_procedure_id()
+            },
+            None => {
+                let cur = self.max_procedure_id;
+                self.max_procedure_id += 1;
+                cur
+            },
+        }
     }
 
     // TODO Only sets char handler in this environment - should it be set in parent

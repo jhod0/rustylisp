@@ -19,15 +19,20 @@ use ::core::{LispObj, LispObjRef, AsLispObjRef,
 pub fn lambda_apply(func: &Procedure, arg: LispObjRef) -> EvalResult {
     let (mut env, mut last_to_eval) = try!(lambda_apply_until_last(func, arg));
 
-    match func.name {
-        // If it is a named function, attempt TCO
-        Some(ref fname) => {
-            loop {
-                let (new_env, new_lte) = match last_to_eval.cons_split() {
-                    Some((hd, tl)) => {
+    let fname = func.id;
+    loop {
+        let (new_env, new_lte) = match last_to_eval.cons_split() {
+            Some((hd, tl)) => {
 
-                        if hd.is_symbol() {
-                            if fname == hd.symbol_ref().unwrap() {
+                let env_borrow = env.clone();
+                if let Some(sname) = hd.symbol_ref() {
+
+                    // Lookup the symbol and try to get its procedure id
+                    let lookup_attempt = env_borrow.borrow().lookup(sname);
+                    match lookup_attempt.and_then(|v| v.procedure_id()) {
+                        Some(id) => {
+
+                            if id == fname {
                                 // Tail call, perform tco!
                                 let args = try!(super::map_eval(tl, env.clone()));
                                 /* Reuse environment if possible */
@@ -37,26 +42,31 @@ pub fn lambda_apply(func: &Procedure, arg: LispObjRef) -> EvalResult {
                                     },
                                     Err(_) => try!(lambda_apply_until_last(func, args.to_obj_ref()))
                                 }
-                            } else {
-                                // Non-tail call, vanilla eval
+                            } 
+
+                            else {
+                                // Not a tail-call, normal eval
                                 return super::eval(last_to_eval, env)
                             }
+                        },
 
-                        } else {
-                            // Non-tail call, vanilla eval
-                            return super::eval(last_to_eval, env)
-                        }
-                    },
-                    // Non-call
-                    None => return super::eval(last_to_eval, env)
-                };
-                env = new_env; 
-                last_to_eval = new_lte;
-            }
-        },
+                        // Not a function, do normal eval
+                        None => return super::eval(last_to_eval, env)
+                    }
+                } 
 
-        // Else, vanilla eval
-        None => super::eval(last_to_eval, env)
+                else {
+                    // Non-tail call, vanilla eval
+                    return super::eval(last_to_eval, env)
+                }
+            },
+
+            // Non-call
+            None => return super::eval(last_to_eval, env)
+        };
+
+        env = new_env; 
+        last_to_eval = new_lte;
     }
 }
 
@@ -137,8 +147,17 @@ pub fn parse_args_into<'a>(arity: &ArityObj, mut args: LispObjRef, env: &'a mut 
 /// Parse args and body separately, and construct a single-arity procedure
 pub fn parse_lambda_args_body(args: LispObjRef, body: &[LispObjRef], parent: EnvironmentRef) -> EvalResult<Procedure> {
     let arity = try!(parse_arglist(args));
+    let doc = if body.len() > 0 {
+        body[0].string_ref().map(|s| String::from(s))
+    } else {
+        None
+    };
 
-    Ok(Procedure::single_arity(parent, arity, Vec::from(body)))
+    if let Some(docstr) = doc {
+        Ok(Procedure::single_arity(parent, arity, Vec::from(body)).with_doc(docstr))
+    } else {
+        Ok(Procedure::single_arity(parent, arity, Vec::from(body)))
+    }
 }
 
 /// Creates a single-arity procedure from its arguments and body, flattened into a single array
