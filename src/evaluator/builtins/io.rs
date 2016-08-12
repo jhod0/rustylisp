@@ -8,12 +8,22 @@ use ::evaluator::{self, EvalResult};
 pub fn load_file_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => file_path: LString);
 
-    let global = env::get_top_level(env);
+    let global = env::get_top_level(env.clone());
+
+    let char_handlers = |c: char, obj: LispObj| {
+        let handler = match env.borrow().get_char_handler(c) {
+            Some(handler) => handler,
+            None => return Err(None)
+        };
+
+        evaluator::apply(handler, cons!(obj, nil!()), env.clone())
+            .map_err(|err| Some(err.into_lisp_obj()))
+    };
 
     let file_parser = match Parser::from_file((*file_path).clone()) {
         Ok(file) => file,
         Err(errmsg) => io_error!("cannot open file: {:?}", errmsg),
-    };
+    }.with_char_handler(char_handlers);
 
     let mut out = nil!();
     for parsed_obj in file_parser {

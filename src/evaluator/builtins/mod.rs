@@ -29,7 +29,8 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
 
     // Predicates
     ("bound?", is_bound, None), ("cons?", is_cons, None), ("nil?", is_nil, None),
-    ("symbol?", is_symbol, None), ("string?", is_string, None),
+    ("symbol?", is_symbol, None),  ("string?", is_string, None), 
+    ("symbol=?", symbol_eq, None), ("string=?", string_eq, None),
 
     ("string", string_append_objects, None),
 
@@ -274,6 +275,31 @@ pub fn string_append_objects(args: &[LispObjRef], _: EnvironmentRef) -> EvalResu
     Ok(string!(out))
 }
 
+pub fn string_eq(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    let mut out    = true;
+    let mut string = None;
+
+    for arg in args.iter() {
+        out = match (string, arg.string_ref()) {
+            (None, Some(obj)) => {
+                string = Some(obj);
+                true
+            },
+            (Some(last), Some(obj)) => {
+                if last == obj {
+                    string = Some(obj);
+                    true
+                } else {
+                    return Ok(lisp_false!())
+                }
+            },
+            (_, None) => return Ok(lisp_false!()),
+        };
+    }
+
+    Ok(lisp_bool!(out))
+}
+
 pub fn string_to_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => string: LString);
     let chars = string.chars().map(|c| LispObj::LChar(c));
@@ -283,6 +309,31 @@ pub fn string_to_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 pub fn string_to_symbol(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => string: LString);
     Ok(symbol!((*string).clone()))
+}
+
+pub fn symbol_eq(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    let mut out  = true;
+    let mut symb = None;
+
+    for arg in args.iter() {
+        out = match (symb, arg.symbol_ref()) {
+            (None, Some(obj)) => {
+                symb = Some(obj);
+                true
+            },
+            (Some(last), Some(obj)) => {
+                if last == obj {
+                    symb = Some(obj);
+                    true
+                } else {
+                    return Ok(lisp_false!())
+                }
+            },
+            (_, None) => return Ok(lisp_false!()),
+        };
+    }
+
+    Ok(lisp_bool!(out))
 }
 
 const SUB_DOCSTR: &'static str = "Performs subtraction.

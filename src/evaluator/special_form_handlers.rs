@@ -45,7 +45,8 @@ pub fn get_handler(s: &str) -> Option<NativeFuncSignature> {
 static HANDLERS: &'static [(&'static str, NativeFuncSignature)] =
       &[("and", and_handler), ("begin", begin_handler), ("case-lambda", case_lambda_handler), ("catch-error", catch_error_handler),  
         ("define", define_handler), ("define-macro", define_macro_handler),
-        ("if", if_handler), ("lambda", lambda_handler), ("let", let_handler), ("or", or_handler), ("quote", quote_handler),
+        ("if", if_handler), ("lambda", lambda_handler), ("let", let_handler), ("or", or_handler), 
+        ("quote", quote_handler), ("quasiquote", quasiquote_handler),
         ("set!", set_handler)];
 
 pub fn and_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -128,6 +129,7 @@ pub fn define_macro_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalRes
         syntax_error!("Not enough arguments to define-macro: {}", LispObj::to_lisp_list(args.iter()))
     }
 
+    let top_level = core::env::get_top_level(env.clone());
     if let Some((hd, tl)) = args[0].cons_split() {
         if hd.is_symbol() {
             let macro_name = (*hd).clone().unwrap_symbol();
@@ -135,7 +137,7 @@ pub fn define_macro_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalRes
             let value      = LispObj::LProcedure(func.with_name(macro_name.clone()));
             let allow_red  = env.borrow().lookup("*allow-redefine*").expect("cannot delete *allow-redefine*");
 
-            match env.borrow_mut().let_macro(macro_name.clone(), value.to_obj_ref()) {
+            match top_level.borrow_mut().let_macro(macro_name.clone(), value.to_obj_ref()) {
                 Some(_) => {
                     if allow_red.falsey() {
                         redefine_error!("macro {} is already bound", macro_name)
@@ -177,6 +179,40 @@ pub fn or_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     }
 
     Ok(val)
+}
+
+fn quasiquote_helper(obj: LispObjRef, env: EnvironmentRef) -> EvalResult {
+    if let Some((hd, tl)) = obj.cons_split() {
+        match (hd.symbol_ref(), tl.cons_split()) {
+            (Some(s), Some((hd2, tl2))) => {
+                if s == "unquote" && tl2.is_nil() {
+                    super::eval(hd2, env)
+                } else {
+                    syntax_error!("quasiquote: invalid unquote, `,{}`", tl)
+                }
+            }
+            (Some(_), None) => {
+                let tail = try!(quasiquote_helper(tl, env));
+                Ok(cons!(hd.clone(), tail))
+            }
+            (None, _) => {
+                let head = try!(quasiquote_helper(hd.clone(), env.clone()));
+                let next = try!(quasiquote_helper(tl, env));
+                Ok(cons!(head, next))
+            }
+        }
+    } else {
+        Ok((*obj).clone())
+    }
+}
+
+pub fn quasiquote_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    if args.len() != 1 {
+        syntax_error!("quasiquote must have exactly 1 argument, given {}", 
+                      LispObj::to_lisp_list(args.iter()))
+    }
+
+    quasiquote_helper(args[0].clone(), env)
 }
 
 pub fn quote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {

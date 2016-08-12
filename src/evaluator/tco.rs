@@ -59,8 +59,8 @@ pub fn handle_special_form_tco(form_name: &str, initial_args: &[LispObjRef], env
 /// ```
 pub fn special_form_tco_until_last(form_name: &str, initial_args: &[LispObjRef], env_input: EnvironmentRef) -> EvalResult<(EnvironmentRef, LispObj)> {
     let mut name = form_name;
-    let mut args: Vec<LispObjRef> = initial_args.iter().map(|obj| obj.to_obj_ref()).collect();
     let mut env  = env_input;
+    let mut args: Vec<LispObjRef> = initial_args.iter().map(|obj| obj.to_obj_ref()).collect();
 
     loop {
         let last = match name {

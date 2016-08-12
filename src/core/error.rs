@@ -1,8 +1,9 @@
-use std::convert::Into;
+use std::convert::{Into, From};
 use std::fmt;
+use std::io;
 use std::mem;
 
-use super::{LispObj, LispObjRef};
+use super::{LispObj, LispObjRef, AsLispObjRef};
 
 pub type EvalResult<Res=LispObj> = Result<Res, RuntimeError>;
 
@@ -15,11 +16,12 @@ pub struct RuntimeError {
 }
 
 impl RuntimeError {
-    pub fn new<S>(errtype: S, val: Option<LispObjRef>, cause: Option<RuntimeError>, source: Option<LispObjRef>) -> Self 
-                where S: Into<String> {
+    pub fn new<S, O>(errtype: S, val: Option<O>, cause: Option<RuntimeError>, source: Option<O>) -> Self 
+                where S: Into<String>,
+                      O: AsLispObjRef {
         RuntimeError {
-            errname: errtype.into(), value: val, 
-            cause: cause.map(Box::new), source: source
+            errname: errtype.into(), value: val.map(|o| o.to_obj_ref()), 
+            cause: cause.map(Box::new), source: source.map(|o| o.to_obj_ref())
         }
     }
 
@@ -72,6 +74,12 @@ impl RuntimeError {
 
     pub fn into_lisp_obj(self) -> LispObj {
         LispObj::LError(self)
+    }
+}
+
+impl From<io::Error> for RuntimeError {
+    fn from(err: io::Error) -> Self {
+        RuntimeError::new("io-error", Some(string!(format!("{}", err))), None, None)
     }
 }
 
