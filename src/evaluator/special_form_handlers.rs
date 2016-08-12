@@ -185,10 +185,14 @@ fn quasiquote_helper(obj: LispObjRef, env: EnvironmentRef) -> EvalResult {
     if let Some((hd, tl)) = obj.cons_split() {
         match (hd.symbol_ref(), tl.cons_split()) {
             (Some(s), Some((hd2, tl2))) => {
-                if s == "unquote" && tl2.is_nil() {
-                    super::eval(hd2, env)
+                if s == "unquote" {
+                    if tl2.is_nil() {
+                        super::eval(hd2, env)
+                    } else {
+                        syntax_error!("quasiquote: invalid unquote, `,{}`", tl)
+                    }
                 } else {
-                    syntax_error!("quasiquote: invalid unquote, `,{}`", tl)
+                    Ok(cons!(hd.clone(), try!(quasiquote_helper(tl, env))))
                 }
             }
             (Some(_), None) => {
