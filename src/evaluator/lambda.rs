@@ -192,13 +192,13 @@ fn parse_arglist(args: LispObjRef) -> EvalResult<ArityObj> {
         if arglist.is_nil() {
             break
         } else if arglist.is_symbol() {
-            rest = Some(arglist.symbol_ref().unwrap().clone());
+            rest = Some(String::from(arglist.symbol_ref().unwrap()));
             break
         } else {
             arglist = match arglist.cons_split() {
                 Some((hd, tl)) => {
                     match hd.symbol_ref() {
-                        Some(name) => argnames.push(name.clone()),
+                        Some(name) => argnames.push(String::from(name)),
                         None       => syntax_error!("ill-formed argument list {}", args)
                     };
                     tl

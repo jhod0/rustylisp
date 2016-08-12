@@ -46,7 +46,9 @@ pub enum LispObj {
     /// A float
     LFloat(f64),
     /// A string
-    LString(String),
+    // Rc is to prevent the overhead of copying the string's contents
+    // on calls to clone
+    LString(Rc<String>),
     /// Representation of a symbol
     LSymbol(String),
     /// A character
@@ -346,6 +348,10 @@ impl LispObj {
         LSymbol(name.into())
     }
 
+    pub fn make_string<S: Into<String>>(contents: S) -> Self {
+        LString(Rc::new(contents.into()))
+    }
+
     pub fn make_native<S: Into<String>>(name: S, val: NativeFuncSignature, doc: Option<S>) -> Self {
         LNativeFunc(name.into(), doc.map(|s| Rc::new(s.into())),
                     NativeFunc(Rc::new(val)))
@@ -360,9 +366,9 @@ impl LispObj {
     }
 
 
-    pub fn symbol_ref(&self) -> Option<&String> {
+    pub fn symbol_ref(&self) -> Option<&str> {
         match self {
-            &LSymbol(ref s) => Some(s),
+            &LSymbol(ref s) => Some(&*s),
             _ => None,
         }
     }

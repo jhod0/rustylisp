@@ -1,8 +1,8 @@
 use ::core::{EnvironmentRef, LispObjRef, AsLispObjRef, EvalResult};
 use ::core::obj::NativeFuncSignature;
 
-pub fn get_handler(name: &String, env: EnvironmentRef) -> Option<LispObjRef> {
-    env.borrow().lookup_macro(&*name)
+pub fn get_handler(name: &str, env: EnvironmentRef) -> Option<LispObjRef> {
+    env.borrow().lookup_macro(name)
 }
 
 pub fn try_macro_expand_obj(obj: LispObjRef, env: EnvironmentRef) -> EvalResult<Option<LispObjRef>> {
@@ -17,7 +17,7 @@ pub fn try_macro_expand_obj(obj: LispObjRef, env: EnvironmentRef) -> EvalResult<
     }
 }
 
-pub fn try_macro_expand(macro_name: &String, args: LispObjRef, env: EnvironmentRef) -> EvalResult<Option<LispObjRef>> {
+pub fn try_macro_expand(macro_name: &str, args: LispObjRef, env: EnvironmentRef) -> EvalResult<Option<LispObjRef>> {
     if let Some(handler) = get_handler(macro_name, env.clone()) {
         let macro_expander = handler.unwrap_proc();
         match super::lambda::lambda_apply(macro_expander, args) {

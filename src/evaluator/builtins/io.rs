@@ -10,7 +10,7 @@ pub fn load_file_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult
 
     let global = env::get_top_level(env);
 
-    let file_parser = match Parser::from_file(file_path) {
+    let file_parser = match Parser::from_file((*file_path).clone()) {
         Ok(file) => file,
         Err(errmsg) => io_error!("cannot open file: {:?}", errmsg),
     };

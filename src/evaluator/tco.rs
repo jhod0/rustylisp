@@ -78,7 +78,7 @@ pub fn special_form_tco_until_last(form_name: &str, initial_args: &[LispObjRef],
         let (new_name, new_args) = match last.cons_split() {
             Some((hd, tl)) => { 
                 if let Some(s) = hd.symbol_ref() {
-                    if let Ok(ind) = TCO_BUILTINS.binary_search(&s.as_str()) {
+                    if let Ok(ind) = TCO_BUILTINS.binary_search(&s) {
                         let vec = flatten_list!(tl, "ill-formed-list");
                         (TCO_BUILTINS[ind], vec)
                     } else {

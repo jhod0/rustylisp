@@ -90,7 +90,7 @@ pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         }
     } else if let Some((hd, tl)) = args[0].cons_split() {
         if hd.is_symbol() {
-            let func_name = hd.symbol_ref().unwrap().clone();
+            let func_name = String::from(hd.symbol_ref().unwrap());
             let func      = try!(super::lambda::parse_lambda_args_body(tl, &args[1..], env.clone()));
             let value     = LispObj::LProcedure(func.with_name(func_name.clone()));
 

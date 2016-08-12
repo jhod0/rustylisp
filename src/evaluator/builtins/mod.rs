@@ -282,7 +282,7 @@ pub fn string_to_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 
 pub fn string_to_symbol(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => string: LString);
-    Ok(symbol!(string))
+    Ok(symbol!((*string).clone()))
 }
 
 const SUB_DOCSTR: &'static str = "Performs subtraction.

@@ -55,7 +55,7 @@ macro_rules! quote {
 /// # }
 /// ```
 macro_rules! string {
-    ($str:expr) => ( $crate::core::LispObj::LString(String::from($str)) ) 
+    ($str:expr) => ( $crate::core::LispObj::make_string($str) )
 }
 
 #[macro_export]
