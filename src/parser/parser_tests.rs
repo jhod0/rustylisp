@@ -1,4 +1,4 @@
-use super::parser::{self, Parser};
+use super::parser::Parser;
 use ::core::LispObj;
 
 type Test<'a> = (&'a str, Vec<LispObj>);
@@ -33,8 +33,7 @@ fn test_parser_1() {
         "(1 2 3 4 5)" => { 
             LispObj::to_lisp_list((1..6).map(|n| int!(n)))
         },
-        "' hello there" => {
-            LispObj::LSpecialChar('\''),
+        "hello there" => {
             symbol!("hello"),
             symbol!("there")
         }

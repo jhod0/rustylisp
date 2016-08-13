@@ -16,7 +16,7 @@ pub fn load_file_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult
             None => return Err(None)
         };
 
-        evaluator::apply(handler, cons!(obj, nil!()), env.clone())
+        evaluator::apply(handler, lisp_list!(obj), env.clone())
             .map_err(|err| Some(err.into_lisp_obj()))
     };
 
@@ -73,7 +73,7 @@ pub fn read_handler(_: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let char_handler = |c, obj| {
         match top_level.borrow().get_char_handler(c) {
             Some(handler) => {
-                evaluator::apply(handler, cons!(obj, nil!()), top_level.clone())
+                evaluator::apply(handler, lisp_list!(obj), top_level.clone())
                            .map_err(|err| Some(err.into_lisp_obj()))
             },
             None => Err(None),
