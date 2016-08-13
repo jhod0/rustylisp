@@ -25,6 +25,11 @@ impl RuntimeError {
         }
     }
 
+    pub fn error<S>(errtype: S) -> Self 
+                where S: Into<String> {
+        Self::new::<S, LispObj>(errtype, None, None, None)
+    }
+
     pub fn new_from(cause: RuntimeError, source: LispObjRef) -> Self {
         RuntimeError::new(cause.errname.clone(), cause.value.clone(), Some(cause), Some(source))
     }

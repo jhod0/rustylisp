@@ -258,7 +258,7 @@ Examples:
 pub fn product(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     let mut out = int!(1);
 
-    for num in &args[1..] {
+    for num in args {
         out = try!(mult_two(out, (**num).clone()));
     }
 
@@ -268,7 +268,7 @@ pub fn product(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 pub fn string_append_objects(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     let mut out = String::new();
 
-    for obj in args.iter() {
+    for obj in args {
         out.push_str(&format!("{}", obj));
     }
 
@@ -279,7 +279,7 @@ pub fn string_eq(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     let mut out    = true;
     let mut string = None;
 
-    for arg in args.iter() {
+    for arg in args {
         out = match (string, arg.string_ref()) {
             (None, Some(obj)) => {
                 string = Some(obj);
@@ -315,7 +315,7 @@ pub fn symbol_eq(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     let mut out  = true;
     let mut symb = None;
 
-    for arg in args.iter() {
+    for arg in args {
         out = match (symb, arg.symbol_ref()) {
             (None, Some(obj)) => {
                 symb = Some(obj);
