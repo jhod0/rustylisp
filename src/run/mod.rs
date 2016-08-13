@@ -1,4 +1,7 @@
 //! The ease-of-use run system
+#[cfg(test)]
+mod test;
+
 use std::fmt;
 use std::io::{self, Read};
 
@@ -29,7 +32,7 @@ impl Evaluator {
             None => return Err(None),
         };
 
-        evaluator::apply(handler, cons!(obj, nil!()), self.top_level.clone())
+        evaluator::apply(handler, lisp_list!(obj), self.top_level.clone())
                    .map_err(|err| Some(err.into_lisp_obj()))
     }
 

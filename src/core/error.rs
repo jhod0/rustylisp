@@ -7,7 +7,7 @@ use super::{LispObj, LispObjRef, AsLispObjRef};
 
 pub type EvalResult<Res=LispObj> = Result<Res, RuntimeError>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RuntimeError {
     pub errname: String,
     pub value:   Option<LispObjRef>,
