@@ -59,6 +59,16 @@ macro_rules! string {
 }
 
 #[macro_export]
+macro_rules! lisp_list {
+    [ $obj:expr ] => {
+        cons!($obj, nil!())
+    };
+    [ $obj:expr, $( $other:expr ),+ ] => {
+        cons!($obj, lisp_list!($( $other ),+))
+    }
+}
+
+#[macro_export]
 macro_rules! lisp_true {
     () => ( symbol!("true") )
 }
