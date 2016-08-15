@@ -88,6 +88,14 @@ fn test_string_escapes() {
             QuotedString(String::from("list")), QuotedString(String::from("of")),
             QuotedString(String::from("\"escaped strings\"")), 
             CloseParen
+        },
+        "(\"string\" \"with a \ttab\" \"with a \nnewline\"
+          \"with a \\\\slash\")" => {
+              OpenParen,
+              QuotedString(String::from("string")), QuotedString(String::from("with a \ttab")),
+              QuotedString(String::from("with a \nnewline")),
+              QuotedString(String::from("with a \\slash")),
+              CloseParen
         }
     );
 }
