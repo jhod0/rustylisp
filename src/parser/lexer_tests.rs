@@ -86,7 +86,7 @@ fn test_string_escapes() {
         "(\"list\" \"of\" \"\\\"escaped strings\\\"\")" => {
             OpenParen, 
             QuotedString(String::from("list")), QuotedString(String::from("of")),
-            QuotedString(String::from("strings")), 
+            QuotedString(String::from("\"escaped strings\"")), 
             CloseParen
         }
     );

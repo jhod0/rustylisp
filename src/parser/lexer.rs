@@ -33,6 +33,8 @@ pub enum LexError<E> {
     UnknownReadError,
     ReadError(E),
     UnexpectedEndOfInput(String),
+    // For invalid string escapes
+    UnknownEscape(String),
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +51,7 @@ pub struct Lexer<I: Iterator<Item=Result<char,E>>, E> {
     pub source_name: String,
     pub line_no: u32, 
     pub col_no: u32,
+    special_chars: Vec<char>,
     source: Peekable<I>,
 }
 
@@ -86,7 +89,13 @@ impl<I: Iterator<Item=Result<char, E>>, E> Lexer<I, E> {
     pub fn new(it: I, name: String) -> Self {
         Lexer { source_name: name,
                 line_no: 0, col_no: 0,
+                special_chars: Vec::from(SPECIAL_CHARS),
                 source: it.peekable() }
+    }
+
+    pub fn with_special_chars<C>(self, chars: C) -> Self 
+            where Vec<char>: From<C> {
+        Lexer { special_chars: Vec::from(chars), ..self }
     }
 
     pub fn to_vec(self) -> LexResult<Vec<LexedToken>, E> {
@@ -100,7 +109,7 @@ impl<I: Iterator<Item=Result<char, E>>, E> Lexer<I, E> {
     }
 
     fn is_special_char(&self, c: char) -> bool {
-        SPECIAL_CHARS.contains(&c)
+        self.special_chars.contains(&c)
     }
 
     fn advance(&mut self) -> LexResult<char, E> {
@@ -223,6 +232,21 @@ impl<I: Iterator<Item=Result<char, E>>, E> Iterator for Lexer<I, E> {
                 while let Ok(c) = next {
                     if c == '"' {
                         break;
+                    } else if c == '\\' {
+                        if let Ok(cn) = self.advance() {
+                            match cn {
+                                '\\' => s.push('\\'),
+                                't'  => s.push('\t'),
+                                'n'  => s.push('\n'),
+                                '"'  => s.push('"'),
+                                uc   => {
+                                    let errmsg = format!("Unknown string escape: \\{}", uc);
+                                    return Some(Err(LexError::UnknownEscape(errmsg)))
+                                },
+                            }
+                        } else {
+                            break;
+                        };
                     } else {
                         s.push(c)
                     }
@@ -319,6 +343,7 @@ impl<E: error::Error> error::Error for LexError<E> {
             &LexError::UnknownReadError => "Unknown read error",
             &LexError::ReadError(ref e) => e.description(),
             &LexError::UnexpectedEndOfInput(ref s) => &s,
+            &LexError::UnknownEscape(ref s) => &s,
         }
     }
 
@@ -328,6 +353,7 @@ impl<E: error::Error> error::Error for LexError<E> {
             &LexError::UnknownReadError => None,
             &LexError::ReadError(ref e) => Some(e),
             &LexError::UnexpectedEndOfInput(_) => None,
+            &LexError::UnknownEscape(_) => None,
         }
     }
 }

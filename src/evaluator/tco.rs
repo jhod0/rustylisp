@@ -16,47 +16,47 @@ pub fn handle_special_form_tco(form_name: &str, initial_args: &[LispObjRef], env
 /// Evaluate until last expression, handling tail call optimization on certain special forms.
 /// Returns the last expression to be evaluated as a lisp object.
 ///
-/// # Example
-///
-/// ```
-/// # #[macro_use] extern crate rustylisp;
-/// # fn main() {
-/// use rustylisp::evaluator::{default_environment, tco};
-/// use rustylisp::core::AsLispObjRef;
-///
-/// /* We will evaluate:
-///  * (if 'true
-///  *     (list 3)
-///  *     some-name)
-///  *
-///  * and:
-///  * (begin 'true
-///  *        (list 3)
-///  *        some-name)
-///  */
-///
-/// let args = vec![lisp_true!().to_obj_ref(), 
-///                 cons!(symbol!("list"), cons!(int!(3), nil!())).to_obj_ref(),
-///                 symbol!("some-name").to_obj_ref() ];
-/// let env = default_environment().to_env_ref();
-///
-/// let (_, if_res) = tco::special_form_tco_until_last("if", &args, env.clone()).unwrap();
-/// assert_eq!(if_res, cons!(symbol!("list"), cons!(int!(3), nil!())));
-///
-/// let (_, begin_res) = tco::special_form_tco_until_last("begin", &args, env).unwrap();
-/// assert_eq!(begin_res, symbol!("some-name"));
-/// # }
-/// ```
-///
-/// # Panics
-/// Panics when form_name is not a special form. Currently only supports `begin`, `if`, and `let`.
-///
-/// ```rust,should_panic
-/// use rustylisp::evaluator::tco;
-/// use rustylisp::core::Environment;
-///
-/// tco::special_form_tco_until_last("bogus", &[], Environment::empty().to_env_ref());
-/// ```
+// # Example
+//
+// ```
+// # #[macro_use] extern crate rustylisp;
+// # fn main() {
+// use rustylisp::evaluator::{default_environment, tco};
+// use rustylisp::core::AsLispObjRef;
+//
+// /* We will evaluate:
+//  * (if 'true
+//  *     (list 3)
+//  *     some-name)
+//  *
+//  * and:
+//  * (begin 'true
+//  *        (list 3)
+//  *        some-name)
+//  */
+//
+// let args = vec![lisp_true!().to_obj_ref(), 
+//                 cons!(symbol!("list"), cons!(int!(3), nil!())).to_obj_ref(),
+//                 symbol!("some-name").to_obj_ref() ];
+// let env = default_environment().to_env_ref();
+//
+// let (_, if_res) = tco::special_form_tco_until_last("if", &args, env.clone()).unwrap();
+// assert_eq!(if_res, cons!(symbol!("list"), cons!(int!(3), nil!())));
+//
+// let (_, begin_res) = tco::special_form_tco_until_last("begin", &args, env).unwrap();
+// assert_eq!(begin_res, symbol!("some-name"));
+// # }
+// ```
+//
+// # Panics
+// Panics when form_name is not a special form. Currently only supports `begin`, `if`, and `let`.
+//
+// ```rust,should_panic
+// use rustylisp::evaluator::tco;
+// use rustylisp::core::Environment;
+//
+// tco::special_form_tco_until_last("bogus", &[], Environment::empty().to_env_ref());
+// ```
 pub fn special_form_tco_until_last(form_name: &str, initial_args: &[LispObjRef], env_input: EnvironmentRef) -> EvalResult<(EnvironmentRef, LispObj)> {
     let mut name = form_name;
     let mut env  = env_input;
