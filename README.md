@@ -65,6 +65,21 @@ Symbols and linked-lists are as you would expect in a Lisp:
 ;; => '(2 3)
 ```
 
+However, there is also a lazily-evaluated cons type:
+
+```
+(cons? (lazy-cons 1 2))
+;; => true
+
+(let ((cell 
+      (lazy-cons 'a
+            (begin
+              (println "Evaluating cdr!")
+              'b))))
+  (car (cdr cell)))
+
+```
+
 Booleans are simply the symbols `true` and `false`, which are self-evaluating.
 The following values are also considered 'falsey':
 
