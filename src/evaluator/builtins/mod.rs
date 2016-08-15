@@ -8,7 +8,7 @@ mod io;
 
 use std::convert::AsRef;
 
-use ::core::{LispObj, LispObjRef, AsLispObjRef, EnvironmentRef};
+use ::core::{LispObj, LispObjRef, AsLispObjRef, RuntimeError, EnvironmentRef};
 use ::core::obj::{NativeFuncSignature, Procedure};
 use super::EvalResult;
 
@@ -28,9 +28,16 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
     ("apply", apply, None), ("doc", doc, None), ("eval", eval, None), ("macro-expand", macro_expand, None),
 
     // Predicates
-    ("bound?", is_bound, None), ("cons?", is_cons, None), ("nil?", is_nil, None),
+    ("bound?", is_bound, None), ("cons?", is_cons, None), 
+    ("error?", is_error, None), ("nil?", is_nil, None),
     ("symbol?", is_symbol, None),  ("string?", is_string, None), 
+
+    // Equality
     ("symbol=?", symbol_eq, None), ("string=?", string_eq, None),
+
+    // Accessors
+    ("error-type", get_error_type, None),
+    ("error-value", get_error_value, None),
 
     ("string", string_append_objects, None),
 
@@ -42,6 +49,10 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
 
     // Manipulation
     ("car", car, None), ("cdr", cdr, None), ("cons", cons, None),
+
+    // Error
+    ("make-error", make_error, None),
+    ("throw-error", throw_error, None),
 
     // I/O
     ("load-file", io::load_file_handler, None),
@@ -187,6 +198,19 @@ pub fn doc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     }
 }
 
+pub fn get_error_type(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => err: LError);
+    Ok(symbol!(err.errname))
+}
+
+pub fn get_error_value(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => err: LError);
+    match &err.value {
+        &Some(ref val)  => Ok((**val).clone()),
+        &None           => Ok(nil!()),
+    }
+}
+
 pub fn is_bound(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => name: LSymbol);
     Ok(lisp_bool!(env.borrow().lookup(&name).is_some()))
@@ -195,6 +219,11 @@ pub fn is_bound(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 pub fn is_cons(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
     Ok(lisp_bool!(arg.is_cons()))
+}
+
+pub fn is_error(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: Any);
+    Ok(lisp_bool!(arg.is_err()))
 }
 
 pub fn is_nil(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -242,6 +271,32 @@ pub fn macro_expand(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         Some(obj) => Ok((*obj).clone()),
         None => Ok((*val).clone()),
     }
+}
+
+pub fn raw_make_error(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult<RuntimeError> {
+    if args.len() == 0 {
+        arity_error!("no arguments to throw-error")
+    }
+
+    let err = args[0].clone();
+
+    if err.is_symbol() {
+        if args.len() == 2 {
+            Ok(RuntimeError::error(err.symbol_ref().unwrap())
+                             .with_value(&args[1]))
+        } else {
+            Ok(RuntimeError::error(err.symbol_ref().unwrap()))
+        }
+    } else if err.is_err() {
+        Ok(err.unwrap_err().clone())
+    } else {
+        type_error!("cannot throw non-error {}", err)
+    }
+}
+
+pub fn make_error(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    let err = try!(raw_make_error(args, env));
+    Ok(LispObj::make_error(err))
 }
 
 const PRODUCT_DOCSTR: &'static str = "Performs multiplication.
@@ -390,4 +445,9 @@ pub fn symbol_to_char(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 pub fn symbol_to_string(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => name: LSymbol);
     Ok(string!(name))
+}
+
+pub fn throw_error(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    let err = try!(raw_make_error(args, env));
+    Err(err)
 }

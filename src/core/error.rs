@@ -34,6 +34,12 @@ impl RuntimeError {
         RuntimeError::new(cause.errname.clone(), cause.value.clone(), Some(cause), Some(source))
     }
 
+    pub fn with_value<O>(self, value: O) -> Self 
+                where O: AsLispObjRef {
+        Self::new(self.errname, Some(value.to_obj_ref()),
+                  self.cause.map(|b| *b), self.source)
+    }
+
     pub fn with_source(self, source: LispObjRef) -> Self {
         Self::new(self.errname, self.value, self.cause.map(|b| *b), Some(source))
     }

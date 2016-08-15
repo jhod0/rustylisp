@@ -2,7 +2,7 @@ use std::fmt::{self, Display};
 use std::rc::Rc;
 
 pub use ::evaluator::EvalResult;
-use super::EnvironmentRef;
+use super::{error, EnvironmentRef};
 use self::LispObj::*;
 
 pub type NativeFuncSignature        = fn(&[LispObjRef], EnvironmentRef) -> EvalResult;
@@ -69,13 +69,7 @@ pub enum LispObj {
     LProcedure(Procedure),
 
     /// A caught error
-    LError(super::error::RuntimeError),
-
-    /// Special characters:
-    ///     Intended for use by the macro-expander
-    // Characters that may not be part of symbols,
-    // and are used for reader macros
-    LSpecialChar(char),
+    LError(error::RuntimeError),
 
     /*
     /// Various parser types
@@ -98,7 +92,6 @@ impl PartialEq for LispObj {
             (&LNil, &LNil) => true,
             (&LVector(ref me), &LVector(ref you))           => me == you,
             (&LNativeFunc(ref me,_,_), &LNativeFunc(ref you,_,_)) => me == you,
-            (&LSpecialChar(ref me), &LSpecialChar(ref you)) => me == you,
             (_, _) => false,
         }
     }
@@ -243,8 +236,6 @@ impl Display for LispObj {
                 }
             },
             &LError(ref err)    => write!(fmt, "{}", err),
-            &LSpecialChar(ref c) 
-                                => write!(fmt, "{}", c),
                                 /*
             &LParserFileStream(ref stream) => write!(fmt, "<parser-stream:{}>", stream.borrow().source_name()),
             &LParserFromString(ref stream) => write!(fmt, "<parser-stream:{}>", stream.borrow().source_name()),
@@ -360,6 +351,10 @@ impl LispObj {
                     NativeFunc(Rc::new(val)))
     }
 
+    pub fn make_error(err: super::RuntimeError) -> Self {
+        LError(err)
+    }
+
     /// Forms a cons-cell of two objects.
     ///
     /// Also see the `cons!(car, cdr)` macro
@@ -414,16 +409,16 @@ impl LispObj {
         }
     }
 
-    pub fn unwrap_special_char(&self) -> char {
-        match self {
-            &LSpecialChar(ref ch) => *ch,
-            val => panic!("Cannot unwrap_special_char {}", val)
-        }
-    }
-
     pub fn unwrap_proc(&self) -> &Procedure {
         match self {
             &LProcedure(ref procd) => procd,
+            val => panic!("Cannot unwrap_proc on non-procedure {}", val)
+        }
+    }
+
+    pub fn unwrap_err(&self) -> &super::RuntimeError {
+        match self {
+            &LError(ref err) => err,
             val => panic!("Cannot unwrap_proc on non-procedure {}", val)
         }
     }
@@ -524,10 +519,10 @@ impl LispObj {
         }
     }
 
-    pub fn is_special_char(&self) -> bool {
+    pub fn is_err(&self) -> bool {
         match self {
-            &LSpecialChar(_) => true,
-            _ => false,
+            &LError(_) => true,
+            _ => false
         }
     }
 

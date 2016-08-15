@@ -28,32 +28,44 @@ macro_rules! check_type {
     ( $val:expr, LInt ) => {
         match *($val) {
             $crate::core::LispObj::LInt(n) => n,
-            _ => type_error!("expected int, got {}", $val),
+            _ => type_error!("expected int, not {}", $val),
         }
     };
     ( $val:expr, LFloat ) => {
         match *($val) {
             $crate::core::LispObj::LFloat(n) => n,
-            _ => type_error!("expected int, got {}", $val),
+            _ => type_error!("expected int, not {}", $val),
         }
     };
     ( $val:expr, LSymbol ) => {
         match *($val) {
             $crate::core::LispObj::LSymbol(ref name) => name.clone(),
-            _ => type_error!("expected symbol, got {}", $val),
+            _ => type_error!("expected symbol, not {}", $val),
         }
     };
     ( $val:expr, LString ) => {
         match *($val) {
             $crate::core::LispObj::LString(ref name) => name.clone(),
-            _ => type_error!("expected symbol, got {}", $val),
+            _ => type_error!("expected symbol, not {}", $val),
         }
     };
     ( $val:expr, LCons ) => { 
         {
             let macro_ret: (LispObjRef, LispObjRef) = match $val.cons_split() {
                 Some(v) => v,
-                None => type_error!("expected cons, got {}", $val),
+                None => type_error!("expected cons, not {}", $val),
+            };
+
+            macro_ret
+        }
+    };
+    ( $val:expr, LError ) => {
+        {
+            let macro_val = $val;
+            let macro_ret = if macro_val.is_err() {
+                macro_val.unwrap_err().clone()
+            } else {
+                type_error!("expected error, not {}", macro_val)
             };
 
             macro_ret

@@ -6,10 +6,12 @@ fn run_test(contents: &str, expected: EvalResult) {
     let mut runner = super::Evaluator::new();
     let parser = Parser::from_string(contents, "<test>");
     let res = runner.eval_all_from_parser(parser);
+
     match &res {
         &Ok(ref result) => println!("{} => {}", contents, result),
         &Err(ref err) => println!("{} => Err({:?})", contents, err)
     };
+
     match (expected, res) {
         (Ok(exp), Ok(obj))  => assert_eq!(obj, exp),
         // If error, just check they are the same error type
