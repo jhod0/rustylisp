@@ -184,6 +184,42 @@ pub fn division(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     }
 }
 
+pub fn car(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    if args.len() != 1 {
+        arity_error!("wrong number of arguments to car: {}", LispObj::to_lisp_list(args.iter()));
+    } else {
+        let arg = &args[0];
+        if arg.is_cons() {
+            Ok((*arg.car().unwrap()).clone())
+        } else if arg.is_lazy_cons() {
+            Ok((*arg.lazy_car().unwrap()).clone())
+        } else {
+            type_error!("car: expected cons, got {}", arg)
+        }
+    }
+}
+
+pub fn cdr(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    if args.len() != 1 {
+        arity_error!("wrong number of arguments to car: {}", LispObj::to_lisp_list(args.iter()));
+    } else {
+        let arg = &args[0];
+        if arg.is_cons() {
+            Ok((*arg.cdr().unwrap()).clone())
+        } else if arg.is_lazy_cons() {
+            let procd = arg.lazy_cdr().unwrap();
+            super::lambda::lambda_apply(procd, nil!().to_obj_ref())
+        } else {
+            type_error!("cdr: expected cons, got {}", arg)
+        }
+    }
+}
+
+pub fn cons(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => left: Any, right: Any);
+    Ok(cons!(left, right))
+}
+
 pub fn doc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => obj: Any);
 
@@ -196,6 +232,14 @@ pub fn doc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
         },
         _ => Ok(lisp_false!())
     }
+}
+
+pub fn eval(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    if args.len() != 1 {
+        syntax_error!("eval expects 1 argument, got {}", args.len())
+    }
+
+    super::eval(&args[0], env)
 }
 
 pub fn get_error_type(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -218,7 +262,7 @@ pub fn is_bound(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
 pub fn is_cons(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(lisp_bool!(arg.is_cons()))
+    Ok(lisp_bool!(arg.is_cons() || arg.is_lazy_cons()))
 }
 
 pub fn is_error(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -239,29 +283,6 @@ pub fn is_string(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 pub fn is_symbol(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
     Ok(lisp_bool!(arg.is_symbol()))
-}
-
-pub fn car(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
-    unpack_args!(args => arg: LCons);
-    Ok((*arg.0).clone())
-}
-
-pub fn cdr(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
-    unpack_args!(args => arg: LCons);
-    Ok((*arg.1).clone())
-}
-
-pub fn cons(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
-    unpack_args!(args => left: Any, right: Any);
-    Ok(cons!(left, right))
-}
-
-pub fn eval(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
-    if args.len() != 1 {
-        syntax_error!("eval expects 1 argument, got {}", args.len())
-    }
-
-    super::eval(&args[0], env)
 }
 
 pub fn macro_expand(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {

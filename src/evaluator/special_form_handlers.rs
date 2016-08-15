@@ -1,6 +1,6 @@
 use ::core::{self, LispObj, LispObjRef, AsLispObjRef, EnvironmentRef, EvalResult};
 use core::obj::NativeFuncSignature;
-use super::eval;
+use super::{eval, lambda};
 
 /// # Special Form Handlers
 ///
@@ -24,6 +24,7 @@ use super::eval;
  * if                   - yes
  * let                  - partial, need named let
  * lambda               - yes
+ * lazy-cons
  * modify!
  * or                   - yes
  * quote                - yes
@@ -45,7 +46,7 @@ pub fn get_handler(s: &str) -> Option<NativeFuncSignature> {
 static HANDLERS: &'static [(&'static str, NativeFuncSignature)] =
       &[("and", and_handler), ("begin", begin_handler), ("case-lambda", case_lambda_handler), ("catch-error", catch_error_handler),  
         ("define", define_handler), ("define-macro", define_macro_handler),
-        ("if", if_handler), ("lambda", lambda_handler), ("let", let_handler), ("or", or_handler), 
+        ("if", if_handler), ("lambda", lambda_handler), ("lazy-cons", lazy_cons_handler), ("let", let_handler), ("or", or_handler), 
         ("quote", quote_handler), ("quasiquote", quasiquote_handler),
         ("set!", set_handler)];
 
@@ -67,7 +68,7 @@ pub fn begin_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 }
 
 pub fn case_lambda_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
-    let func = try!(super::lambda::parse_multiple_arity(args, env));
+    let func = try!(lambda::parse_multiple_arity(args, env));
     Ok(LispObj::LProcedure(func))
 }
 
@@ -92,7 +93,7 @@ pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     } else if let Some((hd, tl)) = args[0].cons_split() {
         if hd.is_symbol() {
             let func_name = String::from(hd.symbol_ref().unwrap());
-            let func      = try!(super::lambda::parse_lambda_args_body(tl, &args[1..], env.clone()));
+            let func      = try!(lambda::parse_lambda_args_body(tl, &args[1..], env.clone()));
             let value     = LispObj::LProcedure(func.with_name(func_name.clone()));
 
             (func_name, value)
@@ -133,7 +134,7 @@ pub fn define_macro_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalRes
     if let Some((hd, tl)) = args[0].cons_split() {
         if hd.is_symbol() {
             let macro_name = (*hd).clone().unwrap_symbol();
-            let func       = try!(super::lambda::parse_lambda_args_body(tl, &args[1..], env.clone()));
+            let func       = try!(lambda::parse_lambda_args_body(tl, &args[1..], env.clone()));
             let value      = LispObj::LProcedure(func.with_name(macro_name.clone()));
             let allow_red  = env.borrow().lookup("*allow-redefine*").expect("cannot delete *allow-redefine*");
 
@@ -160,8 +161,18 @@ pub fn if_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 }
 
 pub fn lambda_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
-    let procd = try!(super::lambda::parse_lambda(args, env));
+    let procd = try!(lambda::parse_lambda(args, env));
     Ok(LispObj::LProcedure(procd))
+}
+
+pub fn lazy_cons_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    if args.len() != 2 {
+        arity_error!("lazy-cons: wrong number of arguments {}", LispObj::to_lisp_list(args.iter()))
+    } else {
+        let car = try!(super::eval(args[0].clone(), env.clone())).to_obj_ref();
+        let cdr = try!(lambda::parse_lambda_args_body(nil!().to_obj_ref(), &args[1..], env));
+        Ok(LispObj::LLazyCons(car, cdr))
+    }
 }
 
 pub fn let_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {

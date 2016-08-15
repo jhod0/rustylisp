@@ -44,20 +44,31 @@ impl fmt::Debug for Procedure {
 pub enum LispObj {
     /// An integer
     LInteger(i64),
+
     /// A float
     LFloat(f64),
+
     /// A string
     // Rc is to prevent the overhead of copying the string's contents
     // on calls to clone
     LString(Rc<String>),
+
     /// Representation of a symbol
     LSymbol(String),
+
     /// A character
     LChar(char),
+
     /// A Cons cell: A fundamental lisp type
     LCons(LispObjRef, LispObjRef),
+
+    /// A Lazy Cons cell
+    // Procedure must be a thunk (0-argument function)
+    LLazyCons(LispObjRef, Procedure),
+
     /// The empty list
     LNil,
+
     /// A Vector
     LVector(Vec<LispObjRef>),
 
@@ -216,6 +227,7 @@ impl Display for LispObj {
 
                 write!(fmt, ")")
             },
+            &LLazyCons(_, _)    => write!(fmt, "#<lazy-cons>"),
             &LNil               => write!(fmt, "()"),
             &LVector(ref me)    => {
                 try!(write!(fmt, "["));
@@ -491,6 +503,13 @@ impl LispObj {
         }
     }
 
+    pub fn is_lazy_cons(&self) -> bool {
+        match self {
+            &LLazyCons(_, _) => true,
+            _ => false
+        }
+    }
+
     pub fn is_nil(&self) -> bool {
         match self {
             &LNil => true,
@@ -543,9 +562,23 @@ impl LispObj {
         }
     }
 
+    pub fn lazy_car(&self) -> Option<LispObjRef> {
+        match self {
+            &LLazyCons(ref car, _) => Some(car.clone()),
+            _ => None,
+        }
+    }
+
     pub fn cdr(&self) -> Option<LispObjRef> {
         match self {
             &LCons(_, ref cdr) => Some(cdr.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn lazy_cdr(&self) -> Option<&Procedure> {
+        match self {
+            &LLazyCons(_, ref cdr) => Some(cdr),
             _ => None,
         }
     }
