@@ -129,5 +129,7 @@ pub use self::obj::{LispObj, LispObjRef, AsLispObjRef, NativeFunc};
 pub mod env;
 pub use self::env::{Environment, EnvironmentRef};
 
+pub mod procedure;
+
 pub mod error;
 pub use self::error::{RuntimeError, EvalResult};

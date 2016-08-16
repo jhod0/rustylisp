@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use ::core::EvalResult;
-use ::core::obj::{ArityObj, Procedure};
+use ::core::procedure::{ArityObj, Procedure};
 use ::core::{LispObj, LispObjRef, AsLispObjRef,
              Environment, EnvironmentRef};
 
@@ -38,7 +38,9 @@ pub fn lambda_apply(func: &Procedure, arg: LispObjRef) -> EvalResult {
                                 /* Reuse environment if possible */
                                 match Rc::try_unwrap(env) {
                                     Ok(new_env) => {
-                                        try!(lambda_apply_until_last_from(func, args.to_obj_ref(), new_env.into_inner()))
+                                        try!(lambda_apply_until_last_from(func, 
+                                                                          args.to_obj_ref(), 
+                                                                          new_env.into_inner()))
                                     },
                                     Err(_) => try!(lambda_apply_until_last(func, args.to_obj_ref()))
                                 }
