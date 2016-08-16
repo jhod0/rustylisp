@@ -328,9 +328,9 @@ impl LispObj {
         }
     }
 
-    pub fn string_ref(&self) -> Option<&str> {
+    pub fn string_ref(&self) -> Option<Rc<String>> {
         match self {
-            &LString(ref s) => Some(&*s),
+            &LString(ref s) => Some(s.clone()),
             _ => None,
         }
     }

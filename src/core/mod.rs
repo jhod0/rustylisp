@@ -34,6 +34,12 @@ macro_rules! float {
 }
 
 #[macro_export]
+/// Creates a LispObj char
+macro_rules! char {
+    ( $n:expr ) => ( $crate::core::LispObj::LChar($n as char) )
+}
+
+#[macro_export]
 /// Quotes a lisp value.
 ///
 /// # Example
@@ -88,6 +94,7 @@ macro_rules! string {
 /// # }
 /// ```
 macro_rules! lisp_list {
+    [] => { nil!() };
     [ $obj:expr ] => {
         cons!($obj, nil!())
     };

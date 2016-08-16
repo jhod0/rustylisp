@@ -2,7 +2,7 @@ pub use super::lexer::{Token, LexError};
 use super::lexer::{self, Lexer, StringIter};
 use ::core::obj::{LispObj, AsLispObjRef};
 
-use std::convert::Into;
+use std::convert::{AsRef, Into};
 use std::io::{self, Read};
 use std::fmt;
 use std::fs::File;
@@ -82,8 +82,9 @@ impl<I: Iterator<Item=char>> Parser<lexer::CharIter<I>, ()> {
 }
 
 impl Parser<io::Chars<File>, io::CharsError> {
-    pub fn from_file(path: String) -> Result<Self, io::Error> {
-        File::open(path.clone()).map(|file| Self::new(file.chars(), path))
+    pub fn from_file<P: AsRef<::std::path::Path>>(path: P) -> Result<Self, io::Error> {
+        File::open(path.as_ref())
+              .map(|file| Self::new(file.chars(), format!("{:?}", path.as_ref())))
     }
 }
 
@@ -131,16 +132,7 @@ impl<I, E, F> Parser<I, E, F>
     }
 
     pub fn parse_all(self) -> Result<Vec<LispObj>, ParserError<E>> {
-        let mut vec = Vec::new();
-
-        for res in self {
-            match res {
-                Ok(obj) => vec.push(obj),
-                Err(e) => return Err(e),
-            };
-        }
-
-        Ok(vec)
+        self.collect()
     }
 }
 

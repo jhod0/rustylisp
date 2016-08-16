@@ -2,6 +2,7 @@
 #[cfg(test)]
 mod test;
 
+use std::convert::AsRef;
 use std::fmt;
 use std::io::{self, Read};
 
@@ -54,7 +55,7 @@ impl Evaluator {
         }
     }
 
-    pub fn load_from_file(&mut self, path: String) -> EvalResult {
+    pub fn load_from_file<P: AsRef<::std::path::Path>>(&mut self, path: P) -> EvalResult {
         let file_parser = Parser::from_file(path).unwrap();
         self.eval_all_from_parser(file_parser)
     }
@@ -62,10 +63,14 @@ impl Evaluator {
     pub fn eval_all_from_parser<I, E: fmt::Debug, _F>(&mut self, stream: Parser<I, E, _F>) -> EvalResult
             where I: Iterator<Item=Result<char, E>> {
         let mut out = nil!();
+        let source_name = String::from(stream.source_name());
         for item in stream.with_char_handler(|c, obj| self.handle_char(c, obj)) {
             out = match item {
                 Ok(obj)     => try!(evaluator::eval(obj, self.top_level.clone())),
-                Err(err)    => read_error!("{:?}", err),
+                Err(err)    => {
+                    println!("error on input: {}", source_name);
+                    read_error!("{:?}", err)
+                }
             };
         }
         Ok(out)

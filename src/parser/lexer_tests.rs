@@ -15,7 +15,8 @@ macro_rules! tests {
     }
 }
 
-fn run_tests<'a>(tests: Vec<Test<'a>>) { for (input, expected) in tests {
+fn run_tests<'a>(tests: Vec<Test<'a>>) { 
+    for (input, expected) in tests {
         let toks: Vec<_> = Lexer::from_string(input, "<test>".to_string()).collect();
 
         println!("expected: {:?}\nactual:   {:?}\n", expected, 

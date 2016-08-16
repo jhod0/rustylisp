@@ -1,4 +1,5 @@
 use std::convert::{Into, From};
+use std::error::Error;
 use std::fmt;
 use std::io;
 use std::mem;
@@ -90,7 +91,7 @@ impl RuntimeError {
 
 impl From<io::Error> for RuntimeError {
     fn from(err: io::Error) -> Self {
-        RuntimeError::new("io-error", Some(string!(format!("{}", err))), None, None)
+        RuntimeError::new("io-error", Some(string!(err.description())), None, None)
     }
 }
 
