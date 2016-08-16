@@ -29,10 +29,21 @@ impl<T> FromIterator<T> for PersistentVec<T> {
             where I: IntoIterator<Item=T> {
         // Not terribly efficient, but number of items must be known beforehand
         // in order to build the PersistentTrie
-        let v: Vec<T> = iter.into_iter().collect();
-        let len       = v.len();
-        let mut viter = v.into_iter();
-        let cap       = {
+        let into_iter = iter.into_iter();
+        let (mut the_iter, len) = match into_iter.size_hint() {
+            (_, Some(high)) => {
+                (Box::new(into_iter) as Box<Iterator<Item=T>>, high)
+            },
+            _ => {
+                let v: Vec<T> = into_iter.collect();
+                let len       = v.len();
+                let viter     = v.into_iter();
+
+                (Box::new(viter) as Box<Iterator<Item=T>>, len)
+            }
+        };
+
+        let cap = {
             let c = len.next_power_of_two();
             if c < 2 {
                 2
@@ -43,7 +54,7 @@ impl<T> FromIterator<T> for PersistentVec<T> {
 
         PersistentVec {
             size: len, capacity: cap,
-            root: PersistentTrieNode::from_iter_mut(&mut viter, len, cap)
+            root: PersistentTrieNode::from_iter_mut(&mut the_iter, len, cap)
                                       .to_ref()
         }
     }
@@ -115,6 +126,21 @@ impl<T> PersistentVec<T> {
 }
 
 impl<T: Clone> PersistentVec<T> {
+    pub fn repeating(size: usize, item: T) -> Self {
+        struct VecIter<T>(T);
+        impl<T: Clone> Iterator for VecIter<T> {
+            type Item=T;
+            fn next(&mut self) -> Option<T> { Some(self.0.clone()) }
+        }
+        let cap      = size.next_power_of_two();
+        let mut iter = VecIter(item);
+        PersistentVec {
+            size: size, capacity: cap,
+            root: PersistentTrieNode::from_iter_mut(&mut iter, size, cap)
+                                     .to_ref()
+        }
+    }
+
     pub fn insert(&self, index: usize, item: T) -> Option<Self> {
         if index >= self.size {
             None

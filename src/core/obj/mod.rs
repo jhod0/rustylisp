@@ -1,4 +1,4 @@
-mod vec;
+pub mod vec;
 
 use std::fmt::{self, Display};
 use std::rc::Rc;

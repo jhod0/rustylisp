@@ -10,6 +10,7 @@ use std::convert::AsRef;
 
 use ::core::{LispObj, LispObjRef, AsLispObjRef, RuntimeError, EnvironmentRef};
 use ::core::obj::{NativeFuncSignature, Procedure};
+use ::core::obj::vec::PersistentVec;
 use super::EvalResult;
 
 // TODO add documentation for functions
@@ -54,6 +55,9 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
 
     // Manipulation
     ("car", car, None), ("cdr", cdr, None), ("cons", cons, None),
+    ("make-vector", make_vector, None),
+    ("vector-assoc", vector_assoc, None),
+    ("generate-vector", generate_vector, None),
 
     // Error
     ("make-error", make_error, None),
@@ -247,6 +251,20 @@ pub fn eval(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     super::eval(&args[0], env)
 }
 
+pub fn generate_vector(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => len: LInteger, fun: Any);
+    if !(fun.is_proc() || fun.is_native()) {
+        type_error!("generate-vector: expected procedure, not {}", fun)
+    }
+
+    let vec: EvalResult<Vec<_>> = (0..len).map(|i| {
+        let res = try!(super::apply(fun.clone(), lisp_list![int!(i)], env.clone()));
+        Ok(res.to_obj_ref())
+    }).collect();
+
+    Ok(LispObj::LVector(try!(vec).into_iter().collect()))
+}
+
 pub fn get_error_type(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => err: LError);
     Ok(symbol!(err.errname))
@@ -353,6 +371,16 @@ pub fn raw_make_error(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult<Runt
 pub fn make_error(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let err = try!(raw_make_error(args, env));
     Ok(LispObj::make_error(err))
+}
+
+pub fn make_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => size: LInteger, val: Any);
+    let adjsize = if size < 0 {
+        argument_error!("cannot make vector of negative size {}", size)
+    } else {
+        size as usize
+    };
+    Ok(LispObj::LVector(PersistentVec::repeating(adjsize, val)))
 }
 
 const PRODUCT_DOCSTR: &'static str = "Performs multiplication.
@@ -506,6 +534,17 @@ pub fn symbol_to_string(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 pub fn throw_error(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let err = try!(raw_make_error(args, env));
     Err(err)
+}
+
+pub fn vector_assoc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: LVector, index: LInteger, item: Any);
+    match arg.insert(index as usize, item.clone()) {
+        Some(new) => Ok(LispObj::LVector(new)),
+        None      => {
+            runtime_error!("bounds-error", "vector-assoc: index {} is out of bounds of vector {}",
+                           index, item)
+        }
+    }
 }
 
 pub fn vector_to_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
