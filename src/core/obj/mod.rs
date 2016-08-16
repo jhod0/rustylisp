@@ -1,3 +1,5 @@
+mod vec;
+
 use std::fmt::{self, Display};
 use std::rc::Rc;
 
@@ -38,6 +40,10 @@ impl fmt::Debug for Procedure {
     }
 }
 
+pub struct ListIter {
+    list: LispObjRef
+}
+
 /// A type which represents Lisp objects.
 // TODO: Implement Clone
 #[derive(Clone, Debug)]
@@ -70,7 +76,7 @@ pub enum LispObj {
     LNil,
 
     /// A Vector
-    LVector(Vec<LispObjRef>),
+    LVector(vec::PersistentVec<LispObjRef>),
 
     /// A function implemented in Rust
     /// LNativeFunc(name, documentation, func)
@@ -89,6 +95,23 @@ pub enum LispObj {
     */
 }
 
+impl Iterator for ListIter {
+    type Item = Result<LispObjRef, ()>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (new_list, ret) = match *self.list {
+            LCons(ref car, ref cdr) => {
+                (cdr.clone(), Ok(car.clone()))
+            },
+            LNil => return None,
+            _    => (LNil.to_obj_ref(), Err(()))
+        };
+
+        self.list = new_list;
+        Some(ret)
+    }
+}
+
 impl PartialEq for LispObj {
     // TODO Equality for named procedures, lambdas
     fn eq(&self, other: &Self) -> bool {
@@ -101,7 +124,7 @@ impl PartialEq for LispObj {
             (&LCons(ref hme, ref tme), &LCons(ref hyou, ref tyou))                 
                                                             => hme == hyou && tme == tyou,
             (&LNil, &LNil) => true,
-            (&LVector(ref me), &LVector(ref you))           => me == you,
+            (&LVector(ref me), &LVector(ref you))           => me.eq(you),
             (&LNativeFunc(ref me,_,_), &LNativeFunc(ref you,_,_)) => me == you,
             (_, _) => false,
         }
@@ -231,7 +254,12 @@ impl Display for LispObj {
             &LNil               => write!(fmt, "()"),
             &LVector(ref me)    => {
                 try!(write!(fmt, "["));
-                for obj in me {
+                let mut iter = me.iter();
+                if let Some(obj) = iter.next() {
+                    try!(obj.fmt(fmt));
+                }
+                for obj in iter {
+                    try!(write!(fmt, " "));
                     try!(obj.fmt(fmt));
                 }
                 write!(fmt, "]")
@@ -347,6 +375,10 @@ impl LispObj {
         }
     }
 
+    pub fn list_iter(&self) -> ListIter {
+        ListIter { list: self.to_obj_ref() }
+    }
+
     /// Converts a name to a symbol
     ///
     /// Also see the `symbol!(name)` macro
@@ -356,6 +388,11 @@ impl LispObj {
 
     pub fn make_string<S: Into<String>>(contents: S) -> Self {
         LString(Rc::new(contents.into()))
+    }
+
+    /// Converts an iterator into a Lisp vector
+    pub fn make_vector<O: AsLispObjRef, I: Iterator<Item=O>>(it: I) -> Self {
+        LVector(it.map(|o| o.to_obj_ref()).collect())
     }
 
     pub fn make_native<S: Into<String>>(name: S, val: NativeFuncSignature, doc: Option<S>) -> Self {
@@ -390,6 +427,13 @@ impl LispObj {
         }
     }
 
+    pub fn vec_ref(&self) -> Option<&vec::PersistentVec<LispObjRef>> {
+        match self {
+            &LVector(ref v) => Some(v),
+            _ => None
+        }
+    }
+
     pub fn procedure_id(&self) -> Option<u32> {
         match self {
             &LProcedure(ref p) => Some(p.id),
@@ -414,9 +458,16 @@ impl LispObj {
         }
     }
 
-    pub fn unwrap_native(self) -> Rc<NativeFuncSignature> {
+    pub fn unwrap_vec(&self) -> &vec::PersistentVec<LispObjRef> {
         match self {
-            LNativeFunc(_,_,NativeFunc(ref f)) => f.clone(),
+            &LVector(ref v) => v,
+            val => panic!("unwrap_native performed on non-native-func {}", val),
+        }
+    }
+
+    pub fn unwrap_native(&self) -> Rc<NativeFuncSignature> {
+        match self {
+            &LNativeFunc(_,_,NativeFunc(ref f)) => f.clone(),
             val => panic!("unwrap_native performed on non-native-func {}", val),
         }
     }
@@ -500,6 +551,17 @@ impl LispObj {
         match self {
             &LCons(_, _) => true,
             _ => false,
+        }
+    }
+
+    pub fn is_list(&self) -> bool {
+        let mut cell = self.to_obj_ref();
+        loop {
+            cell = match *cell {
+                LCons(_, ref cdr) => cdr.clone(),
+                LNil => return true,
+                _    => return false,
+            }
         }
     }
 

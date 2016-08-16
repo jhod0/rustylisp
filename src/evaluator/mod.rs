@@ -25,9 +25,9 @@ macro_rules! check_type {
     ( $val:expr, Any ) => {
         $val
     };
-    ( $val:expr, LInt ) => {
+    ( $val:expr, LInteger ) => {
         match *($val) {
-            $crate::core::LispObj::LInt(n) => n,
+            $crate::core::LispObj::LInteger(n) => n,
             _ => type_error!("expected int, not {}", $val),
         }
     };
@@ -57,6 +57,13 @@ macro_rules! check_type {
             };
 
             macro_ret
+        }
+    };
+    ( $val:expr, LVector ) => {
+        if $val.is_vector() {
+            $val.unwrap_vec().clone()
+        } else {
+            type_error!("expected vec, not {}", $val)
         }
     };
     ( $val:expr, LError ) => {

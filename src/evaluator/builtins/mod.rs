@@ -28,9 +28,10 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
     ("apply", apply, None), ("doc", doc, None), ("eval", eval, None), ("macro-expand", macro_expand, None),
 
     // Predicates
-    ("bound?", is_bound, None), ("cons?", is_cons, None), 
-    ("error?", is_error, None), ("nil?", is_nil, None),
-    ("symbol?", is_symbol, None),  ("string?", is_string, None), 
+    ("bound?", is_bound, None),   ("cons?", is_cons, None),
+    ("error?", is_error, None),   ("list?", is_list, None),
+    ("nil?", is_nil, None),       ("symbol?", is_symbol, None),
+    ("string?", is_string, None), ("vector?", is_vector, None),
 
     // Equality
     ("symbol=?", symbol_eq, None), ("string=?", string_eq, None),
@@ -38,10 +39,14 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
     // Accessors
     ("error-type", get_error_type, None),
     ("error-value", get_error_value, None),
+    ("vector-length", get_vector_length, None),
+    ("vector-ref", get_vector_index, None),
 
     ("string", string_append_objects, None),
 
     // Conversion
+    ("list->vector", list_to_vector, None),
+    ("vector->list", vector_to_list, None),
     ("string->list", string_to_list, None),
     ("string->symbol", string_to_symbol, None),
     ("symbol->char", symbol_to_char, None),
@@ -255,6 +260,16 @@ pub fn get_error_value(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     }
 }
 
+pub fn get_vector_length(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => vec: LVector);
+    Ok(int!(vec.len()))
+}
+
+pub fn get_vector_index(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => vec: LVector, ind: LInteger);
+    Ok(vec.lookup(ind as usize).map_or(lisp_false!(), |val| (**val).clone()))
+}
+
 pub fn is_bound(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => name: LSymbol);
     Ok(lisp_bool!(env.borrow().lookup(&name).is_some()))
@@ -270,6 +285,11 @@ pub fn is_error(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     Ok(lisp_bool!(arg.is_err()))
 }
 
+pub fn is_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: Any);
+    Ok(lisp_bool!(arg.is_list()))
+}
+
 pub fn is_nil(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
     Ok(lisp_bool!(arg.is_nil()))
@@ -283,6 +303,21 @@ pub fn is_string(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 pub fn is_symbol(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
     Ok(lisp_bool!(arg.is_symbol()))
+}
+
+pub fn is_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: Any);
+    Ok(lisp_bool!(arg.is_vector()))
+}
+
+pub fn list_to_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => list: Any);
+    if list.is_list() {
+        let list_items = list.list_iter().map(|res| res.unwrap());
+        Ok(LispObj::make_vector(list_items))
+    } else {
+        argument_error!("expected proper list, not {}", list)
+    }
 }
 
 pub fn macro_expand(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -471,4 +506,9 @@ pub fn symbol_to_string(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 pub fn throw_error(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let err = try!(raw_make_error(args, env));
     Err(err)
+}
+
+pub fn vector_to_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: LVector);
+    Ok(LispObj::to_lisp_list(arg.iter()))
 }
