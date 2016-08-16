@@ -150,7 +150,7 @@ pub fn parse_args_into<'a>(arity: &ArityObj, mut args: LispObjRef, env: &'a mut 
 pub fn parse_lambda_args_body(args: LispObjRef, body: &[LispObjRef], parent: EnvironmentRef) -> EvalResult<Procedure> {
     let arity = try!(parse_arglist(args));
     let doc = if body.len() > 0 {
-        body[0].string_ref().map(|s| String::from(s))
+        body[0].string_ref().map(|s| (*s).clone())
     } else {
         None
     };
@@ -188,7 +188,7 @@ pub fn parse_multiple_arity(args: &[LispObjRef], parent: EnvironmentRef) -> Eval
     } else {
         let procd = Procedure::multiple_arity(parent, clauses);
         match docstr {
-            Some(s) => Ok(procd.with_doc(s)),
+            Some(s) => Ok(procd.with_doc((*s).clone())),
             None => Ok(procd),
         }
     }

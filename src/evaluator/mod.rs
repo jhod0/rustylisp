@@ -4,18 +4,25 @@
 
 #[macro_export]
 macro_rules! unpack_args {
+    ( $args:expr ) => {
+        if $args.len() != 0 {
+            arity_error!("expected no args, not {}", 
+                         $crate::core::obj::LispObj::to_lisp_list($args.iter()))
+        }
+    };
     ( $args:expr => $( $argname:ident: $expect:ident ),+ ) => {
         let mut i = 0;
         $(
             if $args.len() <= i {
-                arity_error!("Too few args")
+                arity_error!("too few args")
             }
             let $argname = check_type!( $args[i].clone(), $expect );
             i += 1;
         )+
 
         if $args.len() != i {
-            arity_error!("Too many args: expected {}, got {}", i, $args.len())
+            arity_error!("too many args: expected {}, not {}", i, 
+                         $crate::core::obj::LispObj::to_lisp_list($args.iter()))
         }
     }
 }
@@ -44,8 +51,8 @@ macro_rules! check_type {
         }
     };
     ( $val:expr, LString ) => {
-        match *($val) {
-            $crate::core::LispObj::LString(ref name) => name.clone(),
+        match $val.string_ref() {
+            Some(name) => name.clone(),
             _ => type_error!("expected symbol, not {}", $val),
         }
     };
