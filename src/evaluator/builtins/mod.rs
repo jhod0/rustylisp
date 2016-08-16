@@ -64,6 +64,7 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
     ("throw-error", throw_error, None),
 
     // I/O
+    ("dump-traceback", dump_traceback, None),
     ("load-file", io::load_file_handler, None),
     ("print", io::print, None),
     ("println", io::println, None),
@@ -243,6 +244,14 @@ pub fn doc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     }
 }
 
+pub fn dump_traceback(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    for arg in args {
+        check_type!(arg, LError).dump_traceback()
+    }
+
+    Ok(lisp_true!())
+}
+
 pub fn eval(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     if args.len() != 1 {
         syntax_error!("eval expects 1 argument, got {}", args.len())
@@ -257,12 +266,12 @@ pub fn generate_vector(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         type_error!("generate-vector: expected procedure, not {}", fun)
     }
 
-    let vec: EvalResult<Vec<_>> = (0..len).map(|i| {
+    let vec: EvalResult<PersistentVec<_>> = (0..len).map(|i| {
         let res = try!(super::apply(fun.clone(), lisp_list![int!(i)], env.clone()));
         Ok(res.to_obj_ref())
     }).collect();
 
-    Ok(LispObj::LVector(try!(vec).into_iter().collect()))
+    Ok(LispObj::LVector(try!(vec)))
 }
 
 pub fn get_error_type(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -349,22 +358,29 @@ pub fn macro_expand(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
 pub fn raw_make_error(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult<RuntimeError> {
     if args.len() == 0 {
-        arity_error!("no arguments to throw-error")
+        arity_error!("make-error: no arguments")
+    } else if args.len() > 2 {
+        arity_error!("make-error: too many arguments")
     }
 
     let err = args[0].clone();
 
-    if err.is_symbol() {
-        if args.len() == 2 {
-            Ok(RuntimeError::error(err.symbol_ref().unwrap())
-                             .with_value(&args[1]))
-        } else {
-            Ok(RuntimeError::error(err.symbol_ref().unwrap()))
-        }
+    let output_err = if err.is_symbol() {
+        RuntimeError::error(err.symbol_ref().unwrap())
     } else if err.is_err() {
-        Ok(err.unwrap_err().clone())
+        err.unwrap_err().clone()
     } else {
-        type_error!("cannot throw non-error {}", err)
+        type_error!("make-error: not an error, {}", LispObj::to_lisp_list(args.iter()))
+    };
+
+    if args.len() == 2 {
+        if args[1].is_err() {
+            Ok(output_err.with_cause(args[1].unwrap_err().clone()))
+        } else {
+            Ok(output_err.with_value(&args[1]))
+        }
+    } else {
+        Ok(output_err)
     }
 }
 
