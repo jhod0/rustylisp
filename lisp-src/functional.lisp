@@ -29,3 +29,10 @@
 (define (flip2 f)
   (lambda (a b)
     (f b a)))
+
+(define (compose . funcs)
+  (fold-left (lambda (f acc)
+               (lambda (a)
+                 (f (acc a))))
+             (lambda (x) x)
+             funcs))

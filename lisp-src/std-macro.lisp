@@ -7,3 +7,9 @@
     `(if ,condition
        ,action
        ,else)))
+
+(define-macro (assert expr)
+   `(let ((evaluated ,expr))
+      (if evaluated
+        evaluated
+        (throw-error 'assertion-error ',expr))))
