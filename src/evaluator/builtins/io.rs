@@ -1,9 +1,77 @@
-use std::io::{self, Read, Write};
 use std::convert::AsRef;
+use std::env as std_env;
+use std::io::{self, Read, Write};
+use std::path;
 
 use ::core::{env, LispObj, LispObjRef, AsLispObjRef, EnvironmentRef};
 use ::parser::Parser;
 use ::evaluator::{self, EvalResult};
+
+
+pub const DIRECTORY_STACK_NAME: &'static str = "*directory-stack*";
+
+pub fn get_current_dir() -> EvalResult {
+    let dir =  try!(std_env::current_dir());
+    from_os_path(dir.as_path())
+}
+
+pub fn set_current_dir(input: &str) -> EvalResult {
+    let path = try!(into_os_path(input));
+    try!(std_env::set_current_dir(path));
+    Ok(lisp_true!())
+}
+
+pub fn into_os_path(input: &str) -> EvalResult<path::PathBuf> {
+    Ok(path::PathBuf::from(input))
+}
+
+fn from_os_path_to_str(input: &path::Path) -> EvalResult<&str> {
+    match input.to_str() {
+        Some(dirstr) => Ok(dirstr),
+        None         => internal_error!("cannot convert {:?} to string", input),
+    }
+}
+
+pub fn from_os_path(input: &path::Path) -> EvalResult {
+    let path = try!(from_os_path_to_str(input));
+    Ok(string!(path))
+}
+
+pub fn lisp_obj_to_path(obj: LispObjRef) -> EvalResult<path::PathBuf> {
+    if let Some((hd, tl)) = obj.cons_split() {
+        let mut path = try!(lisp_obj_to_path(hd));
+        if tl.is_nil() {
+            Ok(path)
+        } else {
+            let rest = try!(lisp_obj_to_path(tl));
+            path.push(rest);
+            Ok(path)
+        }
+    } else if let Some(name) = obj.symbol_ref() {
+        Ok(path::PathBuf::from(String::from(name)))
+    } else if let Some(string) = obj.string_ref() {
+        Ok(path::PathBuf::from((*string).clone()))
+    } else {
+        type_error!("{} is not a path", obj)
+    }
+}
+
+/***************** Lisp Functions **************/
+
+pub fn lisp_get_current_dir(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    if args.len() != 0 {
+        arity_error!("current-dir: expected no arguments, got {}", 
+                     LispObj::to_lisp_list(args.iter()))
+    }
+
+    get_current_dir()
+}
+
+pub fn lisp_set_current_dir(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => new_dir: LString);
+
+    set_current_dir(&*new_dir)
+}
 
 pub fn load_file_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => file_path: LString);
@@ -63,6 +131,48 @@ pub fn println(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     }
 
     Ok(lisp_true!())
+}
+
+pub fn pop_directory(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    unpack_args!(args);
+
+    let retval = env.borrow().lookup(DIRECTORY_STACK_NAME);
+
+    if let Some(dir_stack) = retval {
+        if let Some((hd, tl)) = dir_stack.cons_split() {
+            let old_dir = try!(lisp_obj_to_path(hd));
+            let _  = try!(set_current_dir(try!(from_os_path_to_str(&old_dir))));
+            let _ = env.borrow_mut().swap_values(DIRECTORY_STACK_NAME, tl)
+                       .expect("directory stack should be defined");
+
+            from_os_path(&old_dir)
+        } else if dir_stack.is_nil() {
+            environment_error!("{} is empty", DIRECTORY_STACK_NAME)
+        } else {
+            environment_error!("{} is not a list", DIRECTORY_STACK_NAME)
+        }
+    } else {
+        environment_error!("{} is not defined", DIRECTORY_STACK_NAME)
+    }
+}
+
+pub fn push_directory(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => arg: Any);
+
+    let target_dir = try!(lisp_obj_to_path(arg.clone()));
+    let retval = env.borrow().lookup(DIRECTORY_STACK_NAME);
+
+    if let Some(dir_stack) = retval {
+        let abspath = try!(from_os_path(&try!(target_dir.canonicalize())));
+        let _ = try!(set_current_dir(try!(from_os_path_to_str(&target_dir))));
+        let new_stack = cons!(abspath.clone(), dir_stack).to_obj_ref();
+        let _ = env.borrow_mut().swap_values(DIRECTORY_STACK_NAME, new_stack)
+                   .expect("directory stack should be defined");
+
+        Ok(abspath)
+    } else {
+        environment_error!("{} is not defined", DIRECTORY_STACK_NAME)
+    }
 }
 
 /// TODO handle special chars

@@ -29,46 +29,52 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
     ("apply", apply, None), ("doc", doc, None), ("eval", eval, None), ("macro-expand", macro_expand, None),
 
     // Predicates
-    ("bound?", is_bound, None),   ("cons?", is_cons, None),
-    ("error?", is_error, None),   ("list?", is_list, None),
-    ("nil?", is_nil, None),       ("symbol?", is_symbol, None),
+    ("bound?",  is_bound, None),  ("cons?",   is_cons, None),
+    ("error?",  is_error, None),  ("list?",   is_list, None),
+    ("nil?",    is_nil, None),    ("symbol?", is_symbol, None),
     ("string?", is_string, None), ("vector?", is_vector, None),
 
     // Equality
     ("symbol=?", symbol_eq, None), ("string=?", string_eq, None),
 
     // Accessors
-    ("error-type", get_error_type, None),
-    ("error-value", get_error_value, None),
+    ("error-type",    get_error_type, None),
+    ("error-value",   get_error_value, None),
     ("vector-length", get_vector_length, None),
-    ("vector-ref", get_vector_index, None),
+    ("vector-ref",    get_vector_index, None),
+    ("string-length", get_string_length, None),
+    ("string-ref",    get_string_index, None),
 
     ("string", string_append_objects, None),
 
     // Conversion
-    ("list->vector", list_to_vector, None),
-    ("vector->list", vector_to_list, None),
-    ("string->list", string_to_list, None),
+    ("list->vector",   list_to_vector, None),
+    ("vector->list",   vector_to_list, None),
+    ("string->list",   string_to_list, None),
     ("string->symbol", string_to_symbol, None),
-    ("symbol->char", symbol_to_char, None),
+    ("symbol->char",   symbol_to_char, None),
     ("symbol->string", symbol_to_string, None),
 
-    // Manipulation
+    // Manipulation & creation
     ("car", car, None), ("cdr", cdr, None), ("cons", cons, None),
-    ("make-vector", make_vector, None),
-    ("vector-assoc", vector_assoc, None),
+    ("make-vector",     make_vector, None),
     ("generate-vector", generate_vector, None),
+    ("vector-assoc",    vector_assoc, None),
 
     // Error
-    ("make-error", make_error, None),
+    ("make-error",  make_error, None),
     ("throw-error", throw_error, None),
 
     // I/O
-    ("dump-traceback", dump_traceback, None),
-    ("load-file", io::load_file_handler, None),
-    ("print", io::print, None),
-    ("println", io::println, None),
-    ("read", io::read_handler, None),
+    ("change-directory",  io::lisp_set_current_dir, None),
+    ("current-directory", io::lisp_get_current_dir, None),
+    ("dump-traceback",    dump_traceback, None),
+    ("load-file",         io::load_file_handler, None),
+    ("pop-directory",     io::pop_directory, None),
+    ("push-directory",    io::push_directory, None),
+    ("print",             io::print, None),
+    ("println",           io::println, None),
+    ("read",              io::read_handler, None),
 ];
 
 
@@ -76,7 +82,8 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
 ///
 /// Currently, only maps the symbols true and false to themselves.
 pub fn builtin_vals() -> Vec<(&'static str, LispObj)> {
-    vec![("true", lisp_true!()), ("false", lisp_false!()), ("nil", nil!()), ("*allow-redefine*", lisp_false!())]
+    vec![("true", lisp_true!()), ("false", lisp_false!()), ("nil", nil!()), ("*allow-redefine*", lisp_false!()),
+         (io::DIRECTORY_STACK_NAME, lisp_list![])]
 }
 
 fn add_two(a: LispObj, b: LispObj) -> EvalResult {
@@ -178,22 +185,6 @@ pub fn apply(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     super::apply(func, arg, env)
 }
 
-pub fn division(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
-    if args.len() == 0 {
-        arity_error!("(/) must have at least 1 argument")
-    } else if args.len() == 1 {
-        div_two(int!(1), (*args[0]).clone())
-    } else {
-        let mut out = (*args[0]).clone();
-
-        for num in &args[1..] {
-            out = try!(div_two(out, (**num).clone()));
-        }
-
-        Ok(out)
-    }
-}
-
 pub fn car(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     if args.len() != 1 {
         arity_error!("wrong number of arguments to car: {}", LispObj::to_lisp_list(args.iter()));
@@ -228,6 +219,22 @@ pub fn cdr(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 pub fn cons(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => left: Any, right: Any);
     Ok(cons!(left, right))
+}
+
+pub fn division(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    if args.len() == 0 {
+        arity_error!("(/) must have at least 1 argument")
+    } else if args.len() == 1 {
+        div_two(int!(1), (*args[0]).clone())
+    } else {
+        let mut out = (*args[0]).clone();
+
+        for num in &args[1..] {
+            out = try!(div_two(out, (**num).clone()));
+        }
+
+        Ok(out)
+    }
 }
 
 pub fn doc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -284,6 +291,24 @@ pub fn get_error_value(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     match &err.value {
         &Some(ref val)  => Ok((**val).clone()),
         &None           => Ok(nil!()),
+    }
+}
+
+pub fn get_string_length(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => s: LString);
+    Ok(int!(s.len()))
+}
+
+pub fn get_string_index(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => s: LString, ind: LInteger);
+    if ind >= s.len() as i64 {
+        argument_error!("string-ref: index {} out of bound of string {:?}", ind, s)
+    } else if ind < 0 {
+        argument_error!("string-ref: cannot get char at negative index {}", ind)
+    } else {
+        let i = ind as usize;
+        Ok(char!(s.chars().nth(i)
+                  .expect("rustylisp::evaluator::builtins::get_string_index: index, len mismatch")))
     }
 }
 

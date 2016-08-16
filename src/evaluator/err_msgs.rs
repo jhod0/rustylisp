@@ -27,6 +27,13 @@ macro_rules! bound_error {
 }
 
 #[macro_export]
+macro_rules! environment_error {
+    ( $( $msg:expr ),*) => {
+        runtime_error!( $crate::evaluator::err_msgs::ENVIRONMENT_ERROR  $(, $msg )* )
+    }
+}
+
+#[macro_export]
 macro_rules! internal_error {
     ( $( $msg:expr ),*) => {
         runtime_error!( $crate::evaluator::err_msgs::INTERNAL_ERROR  $(, $msg )* )
@@ -85,6 +92,7 @@ pub static ARGUMENT_ERROR:      &'static str = "argument-error";
 pub static ARITHMETIC_ERROR:    &'static str = "arithmetic-error";
 pub static ARITY_ERROR:         &'static str = "arity-error";
 pub static BOUND_ERROR:         &'static str = "bound-error";
+pub static ENVIRONMENT_ERROR:   &'static str = "environment-error";
 pub static INTERNAL_ERROR:      &'static str = "internal-error";
 pub static IO_ERROR:            &'static str = "io-error";
 pub static MACRO_ERROR:         &'static str = "macro-expansion-error";
