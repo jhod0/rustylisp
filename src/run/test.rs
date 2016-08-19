@@ -1,5 +1,5 @@
 use ::core::{RuntimeError, EvalResult};
-use ::evaluator::{self, err_msgs};
+use ::evaluator::err_msgs;
 use ::parser::Parser;
 
 fn run_test(contents: &str, expected: EvalResult) {

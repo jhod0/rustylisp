@@ -24,7 +24,7 @@ pub type ParseResult<E> = Result<LispObj, ParserError<E>>;
 
 #[derive(Debug, Copy, Clone)]
 pub enum ParserState {
-    Idle, ReaderChar(char), List,
+    Idle, ReaderChar(char), List, Vector
 }
 
 pub type DummyFn = fn(char, LispObj) -> Result<LispObj, Option<LispObj>>;
@@ -104,7 +104,8 @@ impl<I, E, F> Parser<I, E, F>
 
     fn push_obj(&mut self, obj: LispObj) -> Option<Result<LispObj, ParserError<E>>> {
         let c = match self.stack.last_mut() {
-            Some(&mut (ParserState::List, ref mut stack)) => {
+            Some(&mut (ParserState::List, ref mut stack)) |
+            Some(&mut (ParserState::Vector, ref mut stack)) => {
                 stack.push(obj);
                 return None
             },
@@ -204,8 +205,7 @@ impl<I, E, F> Iterator for Parser<I, E, F>
                         Some((ParserState::List, vec)) => {
                             form_lisp_list(vec)
                         },
-                        Some(_) => unimplemented!(),
-                        None => {
+                        _ => {
                             let err = ParserError::UnexpectedDelimiter(Token::CloseParen,
                                                                         tok.line_no, tok.col_no);
                             return Some(Err(err));
@@ -215,6 +215,26 @@ impl<I, E, F> Iterator for Parser<I, E, F>
                     match self.push_obj(list) {
                         Some(obj) => return Some(obj),
                         None => {}
+                    };
+                },
+
+                Token::OpenBracket => self.push_state(ParserState::Vector),
+
+                Token::CloseBracket => {
+                    let vec = match self.pop() {
+                        Some((ParserState::Vector, vec)) => {
+                            LispObj::make_vector(vec.into_iter())
+                        },
+                        _ => {
+                            let err = ParserError::UnexpectedDelimiter(Token::CloseBracket,
+                                                                        tok.line_no, tok.col_no);
+                            return Some(Err(err));
+                        }
+                    };
+
+                    match self.push_obj(vec) {
+                        Some(obj) => return Some(obj),
+                        None => {},
                     };
                 },
 

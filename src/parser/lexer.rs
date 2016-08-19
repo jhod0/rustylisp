@@ -20,6 +20,8 @@ static SPECIAL_CHARS: &'static [char] =
 pub enum Token {
     OpenParen,
     CloseParen,
+    OpenBracket,
+    CloseBracket,
     Number(i64),
     Float(f64),
     Ident(String),
@@ -145,8 +147,9 @@ impl<I: Iterator<Item=Result<char, E>>, E> Lexer<I, E> {
                        => break,
                 Err(e) => return Err(e),
             };
-            if is_whitespace(ch) || ch == '(' || ch == ')' 
-                || self.is_special_char(ch) {
+            if is_whitespace(ch) || ch == '(' || ch == ')' ||
+                ch == '[' || ch == ']' ||
+                self.is_special_char(ch) {
                 break
             } else {
                 s.push(ch)
@@ -203,6 +206,9 @@ impl<I: Iterator<Item=Result<char, E>>, E> Iterator for Lexer<I, E> {
         Some(match ch {
             '(' => Ok(self.make_token(Token::OpenParen)),
             ')' => Ok(self.make_token(Token::CloseParen)),
+
+            '[' => Ok(self.make_token(Token::OpenBracket)),
+            ']' => Ok(self.make_token(Token::CloseBracket)),
 
             // Comment, read till newline
             ';' => {
