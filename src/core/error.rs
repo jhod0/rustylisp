@@ -6,7 +6,7 @@ use std::mem;
 
 use super::{LispObj, LispObjRef, AsLispObjRef};
 
-pub type EvalResult<Res=LispObj> = Result<Res, RuntimeError>;
+pub type EvalResult<Res=LispObjRef> = Result<Res, RuntimeError>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RuntimeError {

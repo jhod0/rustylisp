@@ -34,6 +34,7 @@ impl Evaluator {
         };
 
         evaluator::apply(handler, lisp_list!(obj), self.top_level.clone())
+                   .map(|obj| (*obj).clone())
                    .map_err(|err| Some(err.into_lisp_obj()))
     }
 
@@ -62,7 +63,7 @@ impl Evaluator {
 
     pub fn eval_all_from_parser<I, E: fmt::Debug, _F>(&mut self, stream: Parser<I, E, _F>) -> EvalResult
             where I: Iterator<Item=Result<char, E>> {
-        let mut out = nil!();
+        let mut out = nil!().to_obj_ref();
         let source_name = String::from(stream.source_name());
         for item in stream.with_char_handler(|c, obj| self.handle_char(c, obj)) {
             out = match item {

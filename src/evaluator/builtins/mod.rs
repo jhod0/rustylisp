@@ -88,80 +88,87 @@ pub fn builtin_vals() -> Vec<(&'static str, LispObj)> {
          (io::DIRECTORY_STACK_NAME, lisp_list![])]
 }
 
-fn add_two(a: LispObj, b: LispObj) -> EvalResult {
-    match (a, b) {
-        (LispObj::LInteger(an), LispObj::LInteger(bn))
-            => Ok(int!(an + bn)),
-        (LispObj::LInteger(an), LispObj::LFloat(bn))
-            => Ok(float!((an as f64) + bn)),
-        (LispObj::LFloat(an), LispObj::LInteger(bn))
-            => Ok(float!(an + (bn as f64))),
-        (LispObj::LFloat(an), LispObj::LFloat(bn))
-            => Ok(float!(an + bn)),
-        (LispObj::LInteger(_), right) 
+fn add_two(a: &mut LispObj, b: &LispObj) -> EvalResult<()> {
+    *a = match (&*a, b) {
+        (&LispObj::LInteger(an), &LispObj::LInteger(bn))
+            => int!(an + bn),
+        (&LispObj::LInteger(an), &LispObj::LFloat(bn))
+            => float!((an as f64) + bn),
+        (&LispObj::LFloat(an), &LispObj::LInteger(bn))
+            => float!(an + (bn as f64)),
+        (&LispObj::LFloat(an), &LispObj::LFloat(bn))
+            => float!(an + bn),
+        (&LispObj::LInteger(_), right) 
             => type_error!("expecting number, got {}", right),
-        (LispObj::LFloat(_), right) 
+        (&LispObj::LFloat(_), right) 
             => type_error!("expecting number, got {}", right),
         (left, _) 
             => type_error!("expecting number, got {}", left),
-    }
+    };
+    Ok(())
 }
 
-fn div_two(a: LispObj, b: LispObj) -> EvalResult {
-    match (a, b) {
-        (LispObj::LInteger(an), LispObj::LInteger(bn))
-            => Ok(float!((an as f64) / (bn as f64))),
-        (LispObj::LInteger(an), LispObj::LFloat(bn))
-            => Ok(float!((an as f64) / bn)),
-        (LispObj::LFloat(an), LispObj::LInteger(bn))
-            => Ok(float!(an / (bn as f64))),
-        (LispObj::LFloat(an), LispObj::LFloat(bn))
-            => Ok(float!(an / bn)),
-        (LispObj::LInteger(_), right) 
+fn div_two(a: &mut LispObj, b: &LispObj) -> EvalResult<()> {
+    *a = match (&*a, b) {
+        (&LispObj::LInteger(an), &LispObj::LInteger(bn))
+            => float!((an as f64) / (bn as f64)),
+        (&LispObj::LInteger(an), &LispObj::LFloat(bn))
+            => float!((an as f64) / bn),
+        (&LispObj::LFloat(an), &LispObj::LInteger(bn))
+            => float!(an / (bn as f64)),
+        (&LispObj::LFloat(an), &LispObj::LFloat(bn))
+            => float!(an / bn),
+        (&LispObj::LInteger(_), right) 
             => type_error!("expecting number, got {}", right),
-        (LispObj::LFloat(_), right) 
+        (&LispObj::LFloat(_), right) 
             => type_error!("expecting number, got {}", right),
         (left, _) 
             => type_error!("expecting number, got {}", left),
-    }
+    };
+
+    Ok(())
 }
 
-fn mult_two(a: LispObj, b: LispObj) -> EvalResult {
-    match (a, b) {
-        (LispObj::LInteger(an), LispObj::LInteger(bn))
-            => Ok(int!(an * bn)),
-        (LispObj::LInteger(an), LispObj::LFloat(bn))
-            => Ok(float!((an as f64) * bn)),
-        (LispObj::LFloat(an), LispObj::LInteger(bn))
-            => Ok(float!(an * (bn as f64))),
-        (LispObj::LFloat(an), LispObj::LFloat(bn))
-            => Ok(float!(an * bn)),
-        (LispObj::LInteger(_), right) 
+fn mult_two(a: &mut LispObj, b: &LispObj) -> EvalResult<()> {
+    *a = match (&*a, b) {
+        (&LispObj::LInteger(an), &LispObj::LInteger(bn))
+            => int!(an * bn),
+        (&LispObj::LInteger(an), &LispObj::LFloat(bn))
+            => float!((an as f64) * bn),
+        (&LispObj::LFloat(an), &LispObj::LInteger(bn))
+            => float!(an * (bn as f64)),
+        (&LispObj::LFloat(an), &LispObj::LFloat(bn))
+            => float!(an * bn),
+        (&LispObj::LInteger(_), right) 
             => type_error!("expecting number, got {}", right),
-        (LispObj::LFloat(_), right) 
+        (&LispObj::LFloat(_), right) 
             => type_error!("expecting number, got {}", right),
         (left, _) 
             => type_error!("expecting number, got {}", left),
-    }
+    };
+
+    Ok(())
 }
 
-fn sub_two(a: LispObj, b: LispObj) -> EvalResult {
-    match (a, b) {
-        (LispObj::LInteger(an), LispObj::LInteger(bn))
-            => Ok(int!(an - bn)),
-        (LispObj::LInteger(an), LispObj::LFloat(bn))
-            => Ok(float!((an as f64) - bn)),
-        (LispObj::LFloat(an), LispObj::LInteger(bn))
-            => Ok(float!(an - (bn as f64))),
-        (LispObj::LFloat(an), LispObj::LFloat(bn))
-            => Ok(float!(an - bn)),
-        (LispObj::LInteger(_), right) 
+fn sub_two(a: &mut LispObj, b: &LispObj) -> EvalResult<()> {
+    *a = match (&*a, b) {
+        (&LispObj::LInteger(an), &LispObj::LInteger(bn))
+            => int!(an - bn),
+        (&LispObj::LInteger(an), &LispObj::LFloat(bn))
+            => float!((an as f64) - bn),
+        (&LispObj::LFloat(an), &LispObj::LInteger(bn))
+            => float!(an - (bn as f64)),
+        (&LispObj::LFloat(an), &LispObj::LFloat(bn))
+            => float!(an - bn),
+        (&LispObj::LInteger(_), right) 
             => type_error!("expecting number, got {}", right),
-        (LispObj::LFloat(_), right) 
+        (&LispObj::LFloat(_), right) 
             => type_error!("expecting number, got {}", right),
         (left, _) 
             => type_error!("expecting number, got {}", left),
-    }
+    };
+
+    Ok(())
 }
 
 const ADD_DOCSTR: &'static str = "Performs addition.
@@ -176,10 +183,10 @@ pub fn add(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     let mut out = int!(0);
 
     for num in args {
-        out = try!(add_two(out, (**num).clone()));
+        try!(add_two(&mut out, &**num));
     }
 
-    Ok(out)
+    Ok(out.to_obj_ref())
 }
 
 pub fn apply(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -193,9 +200,9 @@ pub fn car(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     } else {
         let arg = &args[0];
         if arg.is_cons() {
-            Ok((*arg.car().unwrap()).clone())
+            Ok(arg.car().unwrap())
         } else if arg.is_lazy_cons() {
-            Ok((*arg.lazy_car().unwrap()).clone())
+            Ok(arg.lazy_car().unwrap())
         } else {
             type_error!("car: expected cons, got {}", arg)
         }
@@ -208,7 +215,7 @@ pub fn cdr(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     } else {
         let arg = &args[0];
         if arg.is_cons() {
-            Ok((*arg.cdr().unwrap()).clone())
+            Ok(arg.cdr().unwrap())
         } else if arg.is_lazy_cons() {
             let procd = arg.lazy_cdr().unwrap();
             super::lambda::lambda_apply(procd, nil!().to_obj_ref())
@@ -220,36 +227,38 @@ pub fn cdr(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 
 pub fn cons(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => left: Any, right: Any);
-    Ok(cons!(left, right))
+    Ok(cons!(left, right).to_obj_ref())
 }
 
 pub fn division(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     if args.len() == 0 {
         arity_error!("(/) must have at least 1 argument")
     } else if args.len() == 1 {
-        div_two(int!(1), (*args[0]).clone())
+        let mut one = int!(1);
+        try!(div_two(&mut one, &*args[0]));
+        Ok(one.to_obj_ref())
     } else {
         let mut out = (*args[0]).clone();
 
         for num in &args[1..] {
-            out = try!(div_two(out, (**num).clone()));
+            try!(div_two(&mut out, &**num))
         }
 
-        Ok(out)
+        Ok(out.to_obj_ref())
     }
 }
 
 pub fn doc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => obj: Any);
 
-    match (*obj).clone() {
+    match *obj {
         LispObj::LNativeFunc(_, Some(ref docstr), _) => {
-            Ok(string!(docstr.as_ref().clone()))
+            Ok(string!(docstr.as_ref().clone()).to_obj_ref())
         },
         LispObj::LProcedure(Procedure { documentation: Some(ref docstr), ..}) => {
-            Ok(string!(docstr.clone()))
+            Ok(string!(docstr.clone()).to_obj_ref())
         },
-        _ => Ok(lisp_false!())
+        _ => Ok(lisp_false!().to_obj_ref())
     }
 }
 
@@ -258,7 +267,7 @@ pub fn dump_traceback(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
         check_type!(arg, LError).dump_traceback()
     }
 
-    Ok(lisp_true!())
+    Ok(lisp_true!().to_obj_ref())
 }
 
 pub fn eval(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -280,25 +289,25 @@ pub fn generate_vector(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         Ok(res.to_obj_ref())
     }).collect();
 
-    Ok(LispObj::LVector(try!(vec)))
+    Ok(LispObj::LVector(try!(vec)).to_obj_ref())
 }
 
 pub fn get_error_type(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => err: LError);
-    Ok(symbol!(err.errname))
+    Ok(symbol!(err.errname).to_obj_ref())
 }
 
 pub fn get_error_value(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => err: LError);
     match &err.value {
-        &Some(ref val)  => Ok((**val).clone()),
-        &None           => Ok(nil!()),
+        &Some(ref val)  => Ok(val.clone()),
+        &None           => Ok(nil!().to_obj_ref()),
     }
 }
 
 pub fn get_string_length(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => s: LString);
-    Ok(int!(s.len()))
+    Ok(int!(s.len()).to_obj_ref())
 }
 
 pub fn get_string_index(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -310,58 +319,59 @@ pub fn get_string_index(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     } else {
         let i = ind as usize;
         Ok(char!(s.chars().nth(i)
-                  .expect("rustylisp::evaluator::builtins::get_string_index: index, len mismatch")))
+                  .expect("rustylisp::evaluator::builtins::get_string_index: index, len mismatch"))
+           .to_obj_ref())
     }
 }
 
 pub fn get_vector_length(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => vec: LVector);
-    Ok(int!(vec.len()))
+    Ok(int!(vec.len()).to_obj_ref())
 }
 
 pub fn get_vector_index(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => vec: LVector, ind: LInteger);
-    Ok(vec.lookup(ind as usize).map_or(lisp_false!(), |val| (**val).clone()))
+    Ok(vec.lookup(ind as usize).map_or(lisp_false!(), |val| (**val).clone()).to_obj_ref())
 }
 
 pub fn is_bound(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => name: LSymbol);
-    Ok(lisp_bool!(env.borrow().lookup(&name).is_some()))
+    Ok(lisp_bool!(env.borrow().lookup(&name).is_some()).to_obj_ref())
 }
 
 pub fn is_cons(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(lisp_bool!(arg.is_cons() || arg.is_lazy_cons()))
+    Ok(lisp_bool!(arg.is_cons() || arg.is_lazy_cons()).to_obj_ref())
 }
 
 pub fn is_error(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(lisp_bool!(arg.is_err()))
+    Ok(lisp_bool!(arg.is_err()).to_obj_ref())
 }
 
 pub fn is_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(lisp_bool!(arg.is_list()))
+    Ok(lisp_bool!(arg.is_list()).to_obj_ref())
 }
 
 pub fn is_nil(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(lisp_bool!(arg.is_nil()))
+    Ok(lisp_bool!(arg.is_nil()).to_obj_ref())
 }
 
 pub fn is_string(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(lisp_bool!(arg.is_string()))
+    Ok(lisp_bool!(arg.is_string()).to_obj_ref())
 }
 
 pub fn is_symbol(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(lisp_bool!(arg.is_symbol()))
+    Ok(lisp_bool!(arg.is_symbol()).to_obj_ref())
 }
 
 pub fn is_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(lisp_bool!(arg.is_vector()))
+    Ok(lisp_bool!(arg.is_vector()).to_obj_ref())
 }
 
 pub fn list_to_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -369,7 +379,7 @@ pub fn list_to_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     if let Some(n) = list.list_length() {
         let mut list_items = list.list_iter().map(|res| res.unwrap());
         let vec = PersistentVec::from_iter_mut(&mut list_items, n);
-        Ok(LispObj::LVector(vec))
+        Ok(LispObj::LVector(vec).to_obj_ref())
     } else {
         argument_error!("expected proper list, not {}", list)
     }
@@ -379,8 +389,8 @@ pub fn macro_expand(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => val: Any);
 
     match try!(super::macros::try_macro_expand_obj(val.clone(), env)) {
-        Some(obj) => Ok((*obj).clone()),
-        None => Ok((*val).clone()),
+        Some(obj) => Ok(obj),
+        None => Ok(val),
     }
 }
 
@@ -414,7 +424,7 @@ pub fn raw_make_error(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult<Runt
 
 pub fn make_error(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let err = try!(raw_make_error(args, env));
-    Ok(LispObj::make_error(err))
+    Ok(LispObj::make_error(err).to_obj_ref())
 }
 
 pub fn make_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -424,7 +434,7 @@ pub fn make_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     } else {
         size as usize
     };
-    Ok(LispObj::make_vector((0..adjsize).map(|_| val.clone())))
+    Ok(LispObj::make_vector((0..adjsize).map(|_| val.clone())).to_obj_ref())
 }
 
 const PRODUCT_DOCSTR: &'static str = "Performs multiplication.
@@ -442,10 +452,10 @@ pub fn product(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     let mut out = int!(1);
 
     for num in args {
-        out = try!(mult_two(out, (**num).clone()));
+        try!(mult_two(&mut out, &**num))
     }
 
-    Ok(out)
+    Ok(out.to_obj_ref())
 }
 
 pub fn string_append_objects(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -455,7 +465,7 @@ pub fn string_append_objects(args: &[LispObjRef], _: EnvironmentRef) -> EvalResu
         out.push_str(&format!("{}", obj));
     }
 
-    Ok(string!(out))
+    Ok(string!(out).to_obj_ref())
 }
 
 pub fn string_eq(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -473,25 +483,25 @@ pub fn string_eq(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
                     string = Some(obj);
                     true
                 } else {
-                    return Ok(lisp_false!())
+                    return Ok(lisp_false!().to_obj_ref())
                 }
             },
-            (_, None) => return Ok(lisp_false!()),
+            (_, None) => return Ok(lisp_false!().to_obj_ref()),
         };
     }
 
-    Ok(lisp_bool!(out))
+    Ok(lisp_bool!(out).to_obj_ref())
 }
 
 pub fn string_to_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => string: LString);
     let chars = string.chars().map(|c| LispObj::LChar(c));
-    Ok(LispObj::to_lisp_list(chars))
+    Ok(LispObj::to_lisp_list(chars).to_obj_ref())
 }
 
 pub fn string_to_symbol(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => string: LString);
-    Ok(symbol!((*string).clone()))
+    Ok(symbol!((*string).clone()).to_obj_ref())
 }
 
 pub fn symbol_eq(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -509,14 +519,14 @@ pub fn symbol_eq(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
                     symb = Some(obj);
                     true
                 } else {
-                    return Ok(lisp_false!())
+                    return Ok(lisp_false!().to_obj_ref())
                 }
             },
-            (_, None) => return Ok(lisp_false!()),
+            (_, None) => return Ok(lisp_false!().to_obj_ref()),
         };
     }
 
-    Ok(lisp_bool!(out))
+    Ok(lisp_bool!(out).to_obj_ref())
 }
 
 const SUB_DOCSTR: &'static str = "Performs subtraction.
@@ -542,37 +552,39 @@ pub fn sub(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     if args.len() == 0 {
         arity_error!("(-) must have at least one argument")
     } else if args.len() == 1 {
-        sub_two(int!(0), (*args[0]).clone())
+        let mut zero = int!(0);
+        try!(sub_two(&mut zero, &*args[0]));
+        Ok(zero.to_obj_ref())
     } else {
         let mut out = (*args[0]).clone();
 
         for num in &args[1..] {
-            out = try!(sub_two(out, (**num).clone()));
+            try!(sub_two(&mut out, &**num))
         }
 
-        Ok(out)
+        Ok(out.to_obj_ref())
     }
 }
 
 pub fn symbol_to_char(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => sym: LSymbol);
     match &sym as &str {
-        "space"   => return Ok(LispObj::LChar(' ')),
-        "tab"     => return Ok(LispObj::LChar('\t')),
-        "newline" => return Ok(LispObj::LChar('\n')),
+        "space"   => return Ok(LispObj::LChar(' ').to_obj_ref()),
+        "tab"     => return Ok(LispObj::LChar('\t').to_obj_ref()),
+        "newline" => return Ok(LispObj::LChar('\n').to_obj_ref()),
         _ => {},
     };
     let mut iter = sym.chars();
     let ch = iter.next().unwrap();
     match iter.next() {
         Some(_) => argument_error!("symbol '{} has length >1", sym),
-        None => Ok(LispObj::LChar(ch)),
+        None => Ok(LispObj::LChar(ch).to_obj_ref()),
     }
 }
 
 pub fn symbol_to_string(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => name: LSymbol);
-    Ok(string!(name))
+    Ok(string!(name).to_obj_ref())
 }
 
 pub fn throw_error(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -583,7 +595,7 @@ pub fn throw_error(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 pub fn vector_assoc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: LVector, index: LInteger, item: Any);
     match arg.insert(index as usize, item.clone()) {
-        Some(new) => Ok(LispObj::LVector(new)),
+        Some(new) => Ok(LispObj::LVector(new).to_obj_ref()),
         None      => {
             runtime_error!("bounds-error", "vector-assoc: index {} is out of bounds of vector {}",
                            index, item)
@@ -603,7 +615,8 @@ pub fn vector_append(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     Ok(LispObj::LVector(try!(vecs).into_iter()
                                   .flat_map(|v| v.iter())
                                   .map(|obj| obj.clone())
-                                  .collect()))
+                                  .collect())
+       .to_obj_ref())
 }
 
 pub fn vector_map(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -642,10 +655,10 @@ pub fn vector_map(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         super::apply(func.clone(), args, env.clone())
                .map(|v| v.to_obj_ref())
     }).collect();
-    new_vec.map(|v| LispObj::LVector(v))
+    new_vec.map(|v| LispObj::LVector(v).to_obj_ref())
 }
 
 pub fn vector_to_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: LVector);
-    Ok(LispObj::to_lisp_list(arg.iter()))
+    Ok(LispObj::to_lisp_list(arg.iter()).to_obj_ref())
 }

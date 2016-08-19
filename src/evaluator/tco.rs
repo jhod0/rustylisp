@@ -57,7 +57,7 @@ pub fn handle_special_form_tco(form_name: &str, initial_args: &[LispObjRef], env
 //
 // tco::special_form_tco_until_last("bogus", &[], Environment::empty().to_env_ref());
 // ```
-pub fn special_form_tco_until_last(form_name: &str, initial_args: &[LispObjRef], env_input: EnvironmentRef) -> EvalResult<(EnvironmentRef, LispObj)> {
+pub fn special_form_tco_until_last(form_name: &str, initial_args: &[LispObjRef], env_input: EnvironmentRef) -> EvalResult<(EnvironmentRef, LispObjRef)> {
     let mut name = form_name;
     let mut env  = env_input;
     let mut args: Vec<LispObjRef> = initial_args.iter().map(|obj| obj.to_obj_ref()).collect();
@@ -106,12 +106,12 @@ pub fn begin_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult 
     let len = args.len();
 
     if len == 0 {
-        Ok(nil!())
+        Ok(nil!().to_obj_ref())
     } else {
         for i in 0..(len-1) {
             try!(super::eval(&args[i], env.clone()));
         }
-        Ok((*args[len-1]).clone())
+        Ok(args[len-1].clone())
     }
 }
 
@@ -127,15 +127,15 @@ pub fn if_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let truth = try!(super::eval(cond, env));
 
     if truth.falsey() {
-        Ok((*falseval).clone())
+        Ok(falseval.clone())
     } else {
-        Ok((*trueval).clone())
+        Ok(trueval.clone())
     }
 }
 
 /// Let has a different type signature because it can generate a new bindings frame,
 /// which would be destroyed if it wasn't returned
-pub fn let_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult<(EnvironmentRef, LispObj)> {
+pub fn let_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult<(EnvironmentRef, LispObjRef)> {
     let new_env = Environment::from_parent(env.clone()).to_env_ref();
 
     if args.len() < 1 {
@@ -153,10 +153,11 @@ pub fn let_until_last(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult<(E
             syntax_error!("malformed binding: expected symbol, got {}", *name);
         }
 
-        let evaluated = match try!(super::eval(value, new_env.clone())) {
+        let evaluated = try!(super::eval(value, new_env.clone()));
+        /* match try!(super::eval(value, new_env.clone())) {
             LispObj::LProcedure(func) => LispObj::LProcedure(func.with_name((*name).clone().unwrap_symbol())),
             other => other,
-        };
+        }; */
 
         /* Associate evaluated with name */
         new_env.borrow_mut().let_new((*name).clone().unwrap_symbol(), evaluated.to_obj_ref());

@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use ::core::EvalResult;
 use ::core::procedure::{ArityObj, Procedure};
-use ::core::{LispObj, LispObjRef, AsLispObjRef,
+use ::core::{LispObjRef, AsLispObjRef,
              Environment, EnvironmentRef};
 
 /************************** Procedure application ***********************/
@@ -73,12 +73,12 @@ pub fn lambda_apply(func: &Procedure, arg: LispObjRef) -> EvalResult {
 }
 
 /// Same style as tco functions, check module `rustylisp::evaluator::tco`
-pub fn lambda_apply_until_last(func: &Procedure, arg: LispObjRef) -> EvalResult<(EnvironmentRef, LispObj)> {
+pub fn lambda_apply_until_last(func: &Procedure, arg: LispObjRef) -> EvalResult<(EnvironmentRef, LispObjRef)> {
     let (env, body) = try!(start_procedure(func, arg));
     super::tco::special_form_tco_until_last("begin", body, env.to_env_ref())
 }
 
-fn lambda_apply_until_last_from(func: &Procedure, arg: LispObjRef, env: Environment) -> EvalResult<(EnvironmentRef, LispObj)> {
+fn lambda_apply_until_last_from(func: &Procedure, arg: LispObjRef, env: Environment) -> EvalResult<(EnvironmentRef, LispObjRef)> {
     let (env, body) = try!(start_procedure_from(func, arg, env));
     super::tco::special_form_tco_until_last("begin", body, env.to_env_ref())
 }

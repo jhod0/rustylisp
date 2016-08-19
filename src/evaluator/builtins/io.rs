@@ -18,7 +18,7 @@ pub fn get_current_dir() -> EvalResult {
 pub fn set_current_dir(input: &str) -> EvalResult {
     let path = try!(into_os_path(input));
     try!(std_env::set_current_dir(path));
-    Ok(lisp_true!())
+    Ok(lisp_true!().to_obj_ref())
 }
 
 pub fn into_os_path(input: &str) -> EvalResult<path::PathBuf> {
@@ -34,7 +34,7 @@ fn from_os_path_to_str(input: &path::Path) -> EvalResult<&str> {
 
 pub fn from_os_path(input: &path::Path) -> EvalResult {
     let path = try!(from_os_path_to_str(input));
-    Ok(string!(path))
+    Ok(string!(path).to_obj_ref())
 }
 
 pub fn lisp_obj_to_path(obj: LispObjRef) -> EvalResult<path::PathBuf> {
@@ -85,6 +85,7 @@ pub fn load_file_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult
         };
 
         evaluator::apply(handler, lisp_list!(obj), env.clone())
+            .map(|obj| (*obj).clone())
             .map_err(|err| Some(err.into_lisp_obj()))
     };
 
@@ -93,7 +94,8 @@ pub fn load_file_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult
         Err(errmsg) => io_error!("cannot open file: {:?}", errmsg),
     }.with_char_handler(char_handlers);
 
-    let mut out = nil!();
+    let mut out = nil!().to_obj_ref();
+
     for parsed_obj in file_parser {
         let obj = match parsed_obj {
             Ok(obj) => obj,
@@ -118,7 +120,7 @@ pub fn print(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
         Err(err) => io_error!("{:?}", err)
     }
 
-    Ok(lisp_true!())
+    Ok(lisp_true!().to_obj_ref())
 }
 
 pub fn println(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -130,7 +132,7 @@ pub fn println(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         Err(err) => io_error!("{:?}", err)
     }
 
-    Ok(lisp_true!())
+    Ok(lisp_true!().to_obj_ref())
 }
 
 pub fn lisp_pop_directory(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -184,6 +186,7 @@ pub fn read_handler(_: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         match top_level.borrow().get_char_handler(c) {
             Some(handler) => {
                 evaluator::apply(handler, lisp_list!(obj), top_level.clone())
+                           .map(|obj| (*obj).clone())
                            .map_err(|err| Some(err.into_lisp_obj()))
             },
             None => Err(None),
@@ -191,7 +194,7 @@ pub fn read_handler(_: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     };
 
     match instream.with_char_handler(char_handler).next() {
-        Some(Ok(obj))   => Ok(obj),
+        Some(Ok(obj))   => Ok(obj.to_obj_ref()),
         Some(Err(err))  => read_error!("{:?}", err),
         None            => read_error!("end of input"),
     }

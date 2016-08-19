@@ -42,15 +42,15 @@ fn backslash_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
 fn quasiquote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(cons!(symbol!("quasiquote"), cons!(arg, nil!())))
+    Ok(cons!(symbol!("quasiquote"), cons!(arg, nil!())).to_obj_ref())
 }
 
 fn quote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(quote!(arg))
+    Ok(quote!(arg).to_obj_ref())
 }
 
 fn unquote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
-    Ok(cons!(symbol!("unquote"), cons!(arg, nil!())))
+    Ok(cons!(symbol!("unquote"), cons!(arg, nil!())).to_obj_ref())
 }

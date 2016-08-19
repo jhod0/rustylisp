@@ -51,7 +51,7 @@ static HANDLERS: &'static [(&'static str, NativeFuncSignature)] =
         ("set!", set_handler)];
 
 pub fn and_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
-    let mut val = lisp_true!();
+    let mut val = lisp_true!().to_obj_ref();
 
     for arg in args.iter() {
         val = try!(super::eval(arg, env.clone()));
@@ -69,13 +69,13 @@ pub fn begin_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
 pub fn case_lambda_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let func = try!(lambda::parse_multiple_arity(args, env));
-    Ok(LispObj::LProcedure(func))
+    Ok(LispObj::LProcedure(func).to_obj_ref())
 }
 
 pub fn catch_error_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     match begin_handler(args, env) {
         Ok(obj)  => Ok(obj),
-        Err(err) => Ok(err.into_lisp_obj()),
+        Err(err) => Ok(err.into_lisp_obj().to_obj_ref()),
     }
 }
 
@@ -86,15 +86,17 @@ pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
     let (name, value) = if args[0].is_symbol() && args.len() == 2 {
         let name = (*args[0]).clone().unwrap_symbol();
-        match try!(eval(args[1].clone(), env.clone())) {
-            LispObj::LProcedure(p) => (name.clone(), LispObj::LProcedure(p.with_name(name))),
-            val => (name, val)
+        match (*try!(eval(args[1].clone(), env.clone()))).clone() {
+            LispObj::LProcedure(p) => (name.clone(), LispObj::LProcedure(p.with_name(name))
+                                                                         .to_obj_ref()),
+            val => (name, val.to_obj_ref())
         }
     } else if let Some((hd, tl)) = args[0].cons_split() {
         if hd.is_symbol() {
             let func_name = String::from(hd.symbol_ref().unwrap());
             let func      = try!(lambda::parse_lambda_args_body(tl, &args[1..], env.clone()));
-            let value     = LispObj::LProcedure(func.with_name(func_name.clone()));
+            let value     = LispObj::LProcedure(func.with_name(func_name.clone()))
+                            .to_obj_ref();
 
             (func_name, value)
         } else {
@@ -117,10 +119,10 @@ pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
                 if allow_red.falsey() {
                     redefine_error!("symbol {} is already bound", name)
                 } else {
-                    Ok(symbol!(name))
+                    Ok(symbol!(name).to_obj_ref())
                 }
             },
-            None => Ok(symbol!(name)),
+            None => Ok(symbol!(name).to_obj_ref()),
         }
     }
 }
@@ -143,10 +145,10 @@ pub fn define_macro_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalRes
                     if allow_red.falsey() {
                         redefine_error!("macro {} is already bound", macro_name)
                     } else {
-                        Ok(symbol!(macro_name))
+                        Ok(symbol!(macro_name).to_obj_ref())
                     }
                 },
-                None    => Ok(symbol!(macro_name))
+                None    => Ok(symbol!(macro_name).to_obj_ref())
             }
         } else {
             syntax_error!("invalid macro definition: {}", LispObj::to_lisp_list(args.iter()))
@@ -162,7 +164,7 @@ pub fn if_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
 pub fn lambda_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let procd = try!(lambda::parse_lambda(args, env));
-    Ok(LispObj::LProcedure(procd))
+    Ok(LispObj::LProcedure(procd).to_obj_ref())
 }
 
 pub fn lazy_cons_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -171,7 +173,7 @@ pub fn lazy_cons_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult
     } else {
         let car = try!(super::eval(args[0].clone(), env.clone())).to_obj_ref();
         let cdr = try!(lambda::parse_lambda_args_body(nil!().to_obj_ref(), &args[1..], env));
-        Ok(LispObj::LLazyCons(car, cdr))
+        Ok(LispObj::LLazyCons(car, cdr).to_obj_ref())
     }
 }
 
@@ -180,7 +182,7 @@ pub fn let_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 }
 
 pub fn or_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
-    let mut val = lisp_false!();
+    let mut val = lisp_false!().to_obj_ref();
 
     for arg in args.iter() {
         val = try!(super::eval(arg, env.clone()));
@@ -203,21 +205,22 @@ fn quasiquote_helper(obj: LispObjRef, env: EnvironmentRef) -> EvalResult {
                         syntax_error!("quasiquote: invalid unquote, `,{}`", tl)
                     }
                 } else {
-                    Ok(cons!(hd.clone(), try!(quasiquote_helper(tl, env))))
+                    Ok(cons!(hd.clone(), try!(quasiquote_helper(tl, env)))
+                       .to_obj_ref())
                 }
             }
             (Some(_), None) => {
                 let tail = try!(quasiquote_helper(tl, env));
-                Ok(cons!(hd.clone(), tail))
+                Ok(cons!(hd.clone(), tail).to_obj_ref())
             }
             (None, _) => {
                 let head = try!(quasiquote_helper(hd.clone(), env.clone()));
                 let next = try!(quasiquote_helper(tl, env));
-                Ok(cons!(head, next))
+                Ok(cons!(head, next).to_obj_ref())
             }
         }
     } else {
-        Ok((*obj).clone())
+        Ok(obj.clone())
     }
 }
 
@@ -232,7 +235,7 @@ pub fn quasiquote_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResul
 
 pub fn quote_handler(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     if args.len() == 1 {
-        Ok((*args[0]).clone())
+        Ok(args[0].clone())
     } else {
         syntax_error!("wrong number of arguments to quote: {}", LispObj::to_lisp_list(args.iter()))
     }
@@ -244,7 +247,7 @@ pub fn set_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let new_value = try!(super::eval(val, env.clone()));
 
     match env.borrow_mut().swap_values(&name, new_value.to_obj_ref()) {
-        Some(old_val) => Ok((*old_val).clone()),
+        Some(old_val) => Ok(old_val.clone()),
         None => bound_error!("cannot set! unbound symbol {}", name),
     }
 }

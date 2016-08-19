@@ -344,7 +344,7 @@ impl LispObj {
         let vec: vec::PersistentVec<_> = FromIterator::from_iter(adapter.by_ref());
         return match adapter.err {
             Some(err) => Err(err),
-            None      => Ok(LispObj::LVector(vec)),
+            None      => Ok(LispObj::LVector(vec).to_obj_ref()),
         }
     }
 

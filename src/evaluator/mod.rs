@@ -198,7 +198,7 @@ fn is_self_evaluating(obj: LispObjRef) -> bool {
     }
 }
 
-pub fn eval_all<It, Obj>(forms: It, env: EnvironmentRef) -> Result<Vec<LispObj>, RuntimeError> 
+pub fn eval_all<It, Obj>(forms: It, env: EnvironmentRef) -> Result<Vec<LispObjRef>, RuntimeError> 
         where It: Iterator<Item=Obj>, Obj: AsLispObjRef {
     let mut out = vec![];
 
@@ -212,11 +212,11 @@ pub fn eval_all<It, Obj>(forms: It, env: EnvironmentRef) -> Result<Vec<LispObj>,
 
 pub fn map_eval(ls: LispObjRef, env: EnvironmentRef) -> EvalResult {
     if ls.is_nil() {
-        Ok(nil!())
+        Ok(nil!().to_obj_ref())
     } else if let Some((hd, tl)) = ls.cons_split() {
         let this = try!(eval(hd, env.clone()));
         let rest = try!(map_eval(tl, env));
-        Ok(cons!(this, rest))
+        Ok(cons!(this, rest).to_obj_ref())
     } else {
         syntax_error!("not a proper list: {}", ls)
     }
@@ -230,13 +230,13 @@ pub fn eval<Obj>(form_input: Obj, env: EnvironmentRef) -> EvalResult
     loop {
         // If form is self evaluating, we have nothing to do
         if is_self_evaluating(form.clone()) {
-            return Ok((*form).clone());
+            return Ok(form.clone());
         }
 
         // If form is symbol, do lookup
         if let Some(name) = form.symbol_ref() {
             if let Some(val) = env.borrow().lookup(name) {
-                return Ok((*val).clone());
+                return Ok(val.clone());
             } else {
                 bound_error!("symbol '{} is not bound", name)
             }
@@ -266,7 +266,7 @@ pub fn eval<Obj>(form_input: Obj, env: EnvironmentRef) -> EvalResult
 
             let func = try!(eval(hd, env.clone()));
             let args = try!(map_eval(tl, env.clone()));
-            return apply(func, args, env);
+            return apply(func, args, env)
         }
 
         if let Some(vec) = form.vec_ref() {
