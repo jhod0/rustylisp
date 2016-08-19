@@ -160,8 +160,7 @@ mod macros;
 mod special_form_handlers;
 mod tco;
 
-
-pub use core::{LispObj, LispObjRef, 
+pub use core::{self, LispObj, LispObjRef, 
                Environment, EnvironmentRef, AsLispObjRef};
 pub use core::{RuntimeError, EvalResult};
 
@@ -243,7 +242,7 @@ pub fn eval<Obj>(form_input: Obj, env: EnvironmentRef) -> EvalResult
             }
         }
 
-        if let Some((hd, tl)) =  form.cons_split() {
+        if let Some((hd, tl)) = form.cons_split() {
            // Check if hd is a special form
             if let Some(s) = hd.symbol_ref() {
                // Try special form
@@ -268,6 +267,10 @@ pub fn eval<Obj>(form_input: Obj, env: EnvironmentRef) -> EvalResult
             let func = try!(eval(hd, env.clone()));
             let args = try!(map_eval(tl, env.clone()));
             return apply(func, args, env);
+        }
+
+        if let Some(vec) = form.vec_ref() {
+            return LispObj::collect_into_vector(vec.iter().map(|obj| eval(obj, env.clone())))
         }
 
         runtime_error!("eval-error", "unable to evaluate: {}", form)

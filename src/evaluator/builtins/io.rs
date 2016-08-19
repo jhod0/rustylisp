@@ -88,7 +88,7 @@ pub fn load_file_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult
             .map_err(|err| Some(err.into_lisp_obj()))
     };
 
-    let file_parser = match Parser::from_file((*file_path).clone()) {
+    let file_parser = match Parser::from_file(&*file_path) {
         Ok(file) => file,
         Err(errmsg) => io_error!("cannot open file: {:?}", errmsg),
     }.with_char_handler(char_handlers);
@@ -133,7 +133,7 @@ pub fn println(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     Ok(lisp_true!())
 }
 
-pub fn pop_directory(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+pub fn lisp_pop_directory(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args);
 
     let retval = env.borrow().lookup(DIRECTORY_STACK_NAME);
@@ -156,7 +156,7 @@ pub fn pop_directory(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     }
 }
 
-pub fn push_directory(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+pub fn lisp_push_directory(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => arg: Any);
 
     let target_dir = try!(lisp_obj_to_path(arg.clone()));
@@ -196,5 +196,3 @@ pub fn read_handler(_: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         None            => read_error!("end of input"),
     }
 }
-
-//pub fn 

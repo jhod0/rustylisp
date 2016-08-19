@@ -10,7 +10,7 @@ use std::convert::AsRef;
 
 use ::core::{LispObj, LispObjRef, AsLispObjRef, RuntimeError, EnvironmentRef};
 use ::core::obj::{NativeFuncSignature, Procedure};
-use ::core::obj::vec::PersistentVec;
+use ::core::obj::vec::{self, PersistentVec};
 use super::EvalResult;
 
 // TODO add documentation for functions
@@ -60,6 +60,8 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
     ("make-vector",     make_vector, None),
     ("generate-vector", generate_vector, None),
     ("vector-assoc",    vector_assoc, None),
+    ("vector-append",   vector_append, None),
+    ("vector-map",      vector_map, None),
 
     // Error
     ("make-error",  make_error, None),
@@ -70,8 +72,8 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
     ("current-directory", io::lisp_get_current_dir, None),
     ("dump-traceback",    dump_traceback, None),
     ("load-file",         io::load_file_handler, None),
-    ("pop-directory",     io::pop_directory, None),
-    ("push-directory",    io::push_directory, None),
+    ("pop-directory",     io::lisp_pop_directory, None),
+    ("push-directory",    io::lisp_push_directory, None),
     ("print",             io::print, None),
     ("println",           io::println, None),
     ("read",              io::read_handler, None),
@@ -364,9 +366,10 @@ pub fn is_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
 
 pub fn list_to_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => list: Any);
-    if list.is_list() {
-        let list_items = list.list_iter().map(|res| res.unwrap());
-        Ok(LispObj::make_vector(list_items))
+    if let Some(n) = list.list_length() {
+        let mut list_items = list.list_iter().map(|res| res.unwrap());
+        let vec = PersistentVec::from_iter_mut(&mut list_items, n);
+        Ok(LispObj::LVector(vec))
     } else {
         argument_error!("expected proper list, not {}", list)
     }
@@ -421,7 +424,7 @@ pub fn make_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     } else {
         size as usize
     };
-    Ok(LispObj::LVector(PersistentVec::repeating(adjsize, val)))
+    Ok(LispObj::make_vector((0..adjsize).map(|_| val.clone())))
 }
 
 const PRODUCT_DOCSTR: &'static str = "Performs multiplication.
@@ -586,6 +589,60 @@ pub fn vector_assoc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
                            index, item)
         }
     }
+}
+
+pub fn vector_append(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    let vecs: EvalResult<Vec<&PersistentVec<LispObjRef>>> = args.iter().map(|v| {
+        if v.is_vector() {
+            Ok(v.unwrap_vec())
+        } else {
+            type_error!("expected vector, not {}", v)
+        }
+    }).collect();
+
+    Ok(LispObj::LVector(try!(vecs).into_iter()
+                                  .flat_map(|v| v.iter())
+                                  .map(|obj| obj.clone())
+                                  .collect()))
+}
+
+pub fn vector_map(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
+    if args.len() < 2 {
+        arity_error!("vector-map: not enough arguments {}", LispObj::to_lisp_list(args.iter()))
+    }
+
+    let func = args[0].clone();
+    let vecs = try!(args[1..].iter().map(|v| {
+        if v.is_vector() {
+            Ok(v.unwrap_vec().iter())
+        } else {
+            type_error!("expected vector, not {}", v)
+        }
+    }).collect::<Result<Vec<_>,_>>());
+
+    struct VecIter<'a>(Vec<vec::Iter<'a,LispObjRef>>);
+    impl<'a> Iterator for VecIter<'a> {
+        type Item = LispObjRef;
+        fn next(&mut self) -> Option<Self::Item> {
+            let next_ones: Result<LispObj,_> = self.0.iter_mut().map(|v| {
+                match v.next() {
+                    Some(x) => Ok(x.clone()),
+                    None    => Err(()),
+                }
+            }).collect();
+            match next_ones {
+                Ok(v)   => Some(v.to_obj_ref()),
+                Err(()) => None
+            }
+        }
+    }
+
+    let iter = VecIter(vecs);
+    let new_vec: EvalResult<PersistentVec<LispObjRef>> = iter.map(|args| {
+        super::apply(func.clone(), args, env.clone())
+               .map(|v| v.to_obj_ref())
+    }).collect();
+    new_vec.map(|v| LispObj::LVector(v))
 }
 
 pub fn vector_to_list(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {

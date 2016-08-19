@@ -18,7 +18,7 @@ pub struct Procedure {
 
 impl fmt::Display for ArityObj {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        try!(write!(fmt, "<arity-obj:"));
+        try!(write!(fmt, "#<arity-obj:"));
         try!(write!(fmt, "("));
 
         for argname in self.argnames.iter() {
@@ -49,6 +49,7 @@ impl fmt::Debug for Procedure {
         }).collect();
         fmt.debug_struct("Procedure")
            .field("name", &self.name)
+           .field("documentation", &self.documentation)
            .field("body", &body_as_string)
            .finish()
     }

@@ -17,11 +17,31 @@ enum PersistentTrieNode<T> {
     Leaf(Option<T>, Option<T>),
 }
 
+pub struct IntoIter<T> {
+    size: usize,
+    cur:  usize,
+    cap:  usize,
+    root: Rc<PersistentTrieNode<T>>,
+}
+
 pub struct Iter<'a, T: 'a> {
     size: usize,
     cur:  usize,
     cap:  usize,
     root: &'a PersistentTrieNode<T>,
+}
+
+impl<T: Clone> IntoIterator for PersistentVec<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter {
+            size: self.size,
+            cur: 0,
+            cap: self.capacity,
+            root: self.root,
+        }
+    }
 }
 
 impl<T> FromIterator<T> for PersistentVec<T> {
@@ -34,7 +54,7 @@ impl<T> FromIterator<T> for PersistentVec<T> {
             (_, Some(high)) => {
                 (Box::new(into_iter) as Box<Iterator<Item=T>>, high)
             },
-            _ => {
+            (_, None) => {
                 let v: Vec<T> = into_iter.collect();
                 let len       = v.len();
                 let viter     = v.into_iter();
@@ -43,20 +63,7 @@ impl<T> FromIterator<T> for PersistentVec<T> {
             }
         };
 
-        let cap = {
-            let c = len.next_power_of_two();
-            if c < 2 {
-                2
-            } else {
-                c
-            }
-        };
-
-        PersistentVec {
-            size: len, capacity: cap,
-            root: PersistentTrieNode::from_iter_mut(&mut the_iter, len, cap)
-                                      .to_ref()
-        }
+        Self::from_iter_mut(&mut the_iter, len)
     }
 }
 
@@ -83,6 +90,13 @@ impl<T> PersistentVec<T> {
         }
     }
 
+    pub fn concat<I>(iter: I) -> Self 
+            where I: Iterator<Item=PersistentVec<T>>,
+                  T: Clone {
+        iter.flat_map(|v| v.into_iter())
+            .collect()
+    }
+
     pub fn with_size(size: usize) -> Self {
         let adjsize = {
             let adj = size.next_power_of_two();
@@ -96,6 +110,23 @@ impl<T> PersistentVec<T> {
         PersistentVec {
             size: size, capacity: adjsize,
             root: PersistentTrieNode::with_size(adjsize).to_ref()
+        }
+    }
+
+    pub fn from_iter_mut<I>(iter: &mut I, size: usize) -> Self 
+            where I: Iterator<Item=T> {
+        let cap = {
+            let c = size.next_power_of_two();
+            if c < 2 {
+                2
+            } else {
+                c
+            }
+        };
+        PersistentVec {
+            size: size, capacity: cap,
+            root: PersistentTrieNode::from_iter_mut(iter, size, cap)
+                                      .to_ref()
         }
     }
 
@@ -132,13 +163,8 @@ impl<T: Clone> PersistentVec<T> {
             type Item=T;
             fn next(&mut self) -> Option<T> { Some(self.0.clone()) }
         }
-        let cap      = size.next_power_of_two();
         let mut iter = VecIter(item);
-        PersistentVec {
-            size: size, capacity: cap,
-            root: PersistentTrieNode::from_iter_mut(&mut iter, size, cap)
-                                     .to_ref()
-        }
+        Self::from_iter_mut(&mut iter, size)
     }
 
     pub fn insert(&self, index: usize, item: T) -> Option<Self> {
@@ -170,7 +196,8 @@ impl<T: Clone> PersistentVec<T> {
 }
 
 impl<T> PersistentTrieNode<T> {
-    fn from_iter_mut(source: &mut Iterator<Item=T>, count: usize, cap: usize) -> Self {
+    fn from_iter_mut<I>(source: &mut I, count: usize, cap: usize) -> Self 
+            where I: Iterator<Item=T> {
         debug_assert!(cap.is_power_of_two());
         debug_assert!(count <= cap);
         match cap {
@@ -297,6 +324,26 @@ impl<T: Clone> PersistentTrieNode<T> {
     }
 }
 
+impl<T: Clone> Iterator for IntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cur == self.size {
+            None
+        } else {
+            let next = self.root.lookup(self.cur, self.cap)
+                                .expect("vec::Iter::next : invalid size");
+            self.cur += 1;
+            Some(next.clone())
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let n = self.size - self.cur;
+        (n, Some(n))
+    }
+}
+
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
@@ -309,6 +356,11 @@ impl<'a, T> Iterator for Iter<'a, T> {
             self.cur += 1;
             Some(next)
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let n = self.size - self.cur;
+        (n, Some(n))
     }
 }
 
@@ -336,6 +388,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn test_push() {
         let mut pvec = PersistentVec::new();
 

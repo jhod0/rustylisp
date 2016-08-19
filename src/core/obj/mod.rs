@@ -1,11 +1,11 @@
 pub mod vec;
 
 use std::fmt::{self, Display};
+use std::iter::FromIterator;
 use std::rc::Rc;
 
-pub use ::evaluator::EvalResult;
 pub use super::procedure::{Procedure};
-use super::{error, EnvironmentRef};
+use super::{error, EnvironmentRef, EvalResult, RuntimeError};
 use self::LispObj::*;
 
 pub type NativeFuncSignature        = fn(&[LispObjRef], EnvironmentRef) -> EvalResult;
@@ -192,6 +192,13 @@ impl Display for LispObj {
     }
 }
 
+impl<A: AsLispObjRef> FromIterator<A> for LispObj {
+    fn from_iter<I>(iter: I) -> Self
+        where I: IntoIterator<Item=A> {
+        Self::to_lisp_list(iter.into_iter())
+    }
+}
+
 /// To generalize over types which can be converted
 /// to references to LispObj's
 pub trait AsLispObjRef {
@@ -303,6 +310,44 @@ impl LispObj {
         LVector(it.map(|o| o.to_obj_ref()).collect())
     }
 
+    pub fn collect_into_vector<Iter: Iterator<Item=EvalResult>>(it: Iter) -> EvalResult {
+        struct Adapter<Iter> {
+            iter: Iter,
+            err: Option<RuntimeError>,
+        }
+
+        impl<T: AsLispObjRef, Iter: Iterator<Item=EvalResult<T>>> Iterator for Adapter<Iter> {
+            type Item = LispObjRef;
+
+            #[inline]
+            fn next(&mut self) -> Option<Self::Item> {
+                match self.iter.next() {
+                    Some(Ok(obj))  => Some(obj.to_obj_ref()),
+                    Some(Err(obj)) => {
+                        self.err = Some(obj);
+                        None
+                    },
+                    None => None,
+                }
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                if let (_, Some(high)) = self.iter.size_hint() {
+                    (0, Some(high))
+                } else {
+                    panic!("LispObj::collect_into_vector : iterator must implement size_hint")
+                }
+            }
+        }
+
+        let mut adapter = Adapter { iter: it, err: None };
+        let vec: vec::PersistentVec<_> = FromIterator::from_iter(adapter.by_ref());
+        return match adapter.err {
+            Some(err) => Err(err),
+            None      => Ok(LispObj::LVector(vec)),
+        }
+    }
+
     pub fn make_native<S: Into<String>>(name: S, val: NativeFuncSignature, doc: Option<S>) -> Self {
         LNativeFunc(name.into(), doc.map(|s| Rc::new(s.into())),
                     NativeFunc(Rc::new(val)))
@@ -398,6 +443,21 @@ impl LispObj {
         match self {
             &LSymbol(ref s) => s == other,
             _ => false,
+        }
+    }
+
+    pub fn list_length(&self) -> Option<usize> {
+        let mut current = self.to_obj_ref();
+        let mut len = 0;
+
+        loop {
+            current = match *current {
+                LCons(_, ref tl) => tl.clone(),
+                LNil => return Some(len),
+                _ => return None,
+            };
+
+            len += 1;
         }
     }
 
