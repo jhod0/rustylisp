@@ -1,6 +1,7 @@
+#![feature(box_patterns)]
+#![feature(inclusive_range_syntax)]
 #![feature(io)]
 #![feature(range_contains)]
-#![feature(inclusive_range_syntax)]
 
 // This order is important, core's macros are used in parser
 // and evaluator...

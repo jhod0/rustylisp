@@ -1,8 +1,8 @@
-use ::core::{RuntimeError, EvalResult};
+use ::core::{LispObj, AsLispObjRef, RuntimeError, EvalResult};
 use ::evaluator::err_msgs;
 use ::parser::Parser;
 
-fn run_test(contents: &str, expected: EvalResult) {
+fn run_test(contents: &str, expected: EvalResult<LispObj>) {
     let mut runner = super::Evaluator::new();
     let parser = Parser::from_string(contents, "<test>");
     let res = runner.eval_all_from_parser(parser);
@@ -13,10 +13,10 @@ fn run_test(contents: &str, expected: EvalResult) {
     };
 
     match (expected, res) {
-        (Ok(exp), Ok(obj))  => assert_eq!(obj, exp),
+        (Ok(exp), Ok(obj))  => assert_eq!(obj, exp.to_obj_ref()),
         // If error, just check they are the same error type
         (Err(exp), Err(obj)) => assert_eq!(obj.errname, exp.errname),
-        (exp, r) => assert_eq!(r, exp)
+        (_, _) => assert!(false),
     }
 }
 

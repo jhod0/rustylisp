@@ -19,7 +19,6 @@ pub struct ListIter {
 }
 
 /// A type which represents Lisp objects.
-// TODO: Implement Clone
 #[derive(Clone, Debug)]
 pub enum LispObj {
     /// An integer
@@ -44,7 +43,7 @@ pub enum LispObj {
 
     /// A Lazy Cons cell
     // Procedure must be a thunk (0-argument function)
-    LLazyCons(LispObjRef, Procedure),
+    LLazyCons(LispObjRef, Box<Procedure>),
 
     /// The empty list
     LNil,
@@ -57,10 +56,10 @@ pub enum LispObj {
     LNativeFunc(String, Option<Rc<String>>, NativeFunc),
 
     /// A function
-    LProcedure(Procedure),
+    LProcedure(Box<Procedure>),
 
     /// A caught error
-    LError(error::RuntimeError),
+    LError(Box<error::RuntimeError>),
 
     /*
     /// Various parser types
@@ -207,6 +206,7 @@ pub trait AsLispObjRef {
 
 impl AsLispObjRef for LispObjRef {
     fn to_obj_ref(self) -> LispObjRef {
+        //println!("converting {} to a LispObjRef", self);
         self
     }
 }
@@ -353,8 +353,12 @@ impl LispObj {
                     NativeFunc(Rc::new(val)))
     }
 
+    pub fn make_proc(p: Procedure) -> Self {
+        LProcedure(Box::new(p))
+    }
+
     pub fn make_error(err: super::RuntimeError) -> Self {
-        LError(err)
+        LError(Box::new(err))
     }
 
     /// Forms a cons-cell of two objects.
@@ -363,6 +367,11 @@ impl LispObj {
     pub fn cons<Obj1, Obj2>(car: Obj1, cdr: Obj2) -> Self 
             where Obj1: AsLispObjRef, Obj2: AsLispObjRef {
         LCons(car.to_obj_ref(), cdr.to_obj_ref())
+    }
+
+    pub fn lazy_cons<Obj>(car: Obj, cdr: Procedure) -> Self 
+            where Obj: AsLispObjRef {
+        LLazyCons(car.to_obj_ref(), Box::new(cdr))
     }
 
 

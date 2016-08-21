@@ -294,7 +294,7 @@ fn form_lisp_list(mut vec: Vec<LispObj>) -> LispObj {
         let mut out = cons!(a, b); //LispObj::cons(a, b);
 
         for obj in vec.into_iter().rev() {
-            out = LispObj::cons(obj, out);
+            out = cons!(obj, out);
         }
 
         out

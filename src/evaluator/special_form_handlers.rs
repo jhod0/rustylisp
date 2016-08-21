@@ -69,7 +69,7 @@ pub fn begin_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
 pub fn case_lambda_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let func = try!(lambda::parse_multiple_arity(args, env));
-    Ok(LispObj::LProcedure(func).to_obj_ref())
+    Ok(LispObj::make_proc(func).to_obj_ref())
 }
 
 pub fn catch_error_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -87,7 +87,7 @@ pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let (name, value) = if args[0].is_symbol() && args.len() == 2 {
         let name = (*args[0]).clone().unwrap_symbol();
         match (*try!(eval(args[1].clone(), env.clone()))).clone() {
-            LispObj::LProcedure(p) => (name.clone(), LispObj::LProcedure(p.with_name(name))
+            LispObj::LProcedure(p) => (name.clone(), LispObj::make_proc(p.with_name(name))
                                                                          .to_obj_ref()),
             val => (name, val.to_obj_ref())
         }
@@ -95,7 +95,7 @@ pub fn define_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
         if hd.is_symbol() {
             let func_name = String::from(hd.symbol_ref().unwrap());
             let func      = try!(lambda::parse_lambda_args_body(tl, &args[1..], env.clone()));
-            let value     = LispObj::LProcedure(func.with_name(func_name.clone()))
+            let value     = LispObj::make_proc(func.with_name(func_name.clone()))
                             .to_obj_ref();
 
             (func_name, value)
@@ -137,7 +137,7 @@ pub fn define_macro_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalRes
         if hd.is_symbol() {
             let macro_name = (*hd).clone().unwrap_symbol();
             let func       = try!(lambda::parse_lambda_args_body(tl, &args[1..], env.clone()));
-            let value      = LispObj::LProcedure(func.with_name(macro_name.clone()));
+            let value      = LispObj::make_proc(func.with_name(macro_name.clone()));
             let allow_red  = env.borrow().lookup("*allow-redefine*").expect("cannot delete *allow-redefine*");
 
             match top_level.borrow_mut().let_macro(macro_name.clone(), value.to_obj_ref()) {
@@ -164,7 +164,7 @@ pub fn if_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
 
 pub fn lambda_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     let procd = try!(lambda::parse_lambda(args, env));
-    Ok(LispObj::LProcedure(procd).to_obj_ref())
+    Ok(LispObj::make_proc(procd).to_obj_ref())
 }
 
 pub fn lazy_cons_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
@@ -173,7 +173,7 @@ pub fn lazy_cons_handler(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult
     } else {
         let car = try!(super::eval(args[0].clone(), env.clone())).to_obj_ref();
         let cdr = try!(lambda::parse_lambda_args_body(nil!().to_obj_ref(), &args[1..], env));
-        Ok(LispObj::LLazyCons(car, cdr).to_obj_ref())
+        Ok(LispObj::lazy_cons(car, cdr).to_obj_ref())
     }
 }
 

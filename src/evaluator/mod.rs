@@ -41,7 +41,7 @@ macro_rules! check_type {
     ( $val:expr, LFloat ) => {
         match *($val) {
             $crate::core::LispObj::LFloat(n) => n,
-            _ => type_error!("expected int, not {}", $val),
+            _ => type_error!("expected float, not {}", $val),
         }
     };
     ( $val:expr, LSymbol ) => {
@@ -53,7 +53,7 @@ macro_rules! check_type {
     ( $val:expr, LString ) => {
         match $val.string_ref() {
             Some(name) => name.clone(),
-            _ => type_error!("expected symbol, not {}", $val),
+            _ => type_error!("expected string, not {}", $val),
         }
     };
     ( $val:expr, LCons ) => { 
@@ -135,6 +135,9 @@ macro_rules! runtime_error {
             let runtime_err_msg = format!( $( $msg ),+ );
             return Err($crate::core::error::RuntimeError::new($name, Some(string!(runtime_err_msg).to_obj_ref()), None, None))
         }
+    };
+    ( value $value:expr; $name:expr ) => {
+        return Err($crate::core::error::RuntimeError::new($name, Some($value), None, None))
     };
     ( cause $cause:expr; $name:expr ) => {
         return Err($crate::core::error::RuntimeError::new($name, None, Some($cause), None))
@@ -285,7 +288,7 @@ pub fn apply<Obj1, Obj2>(proc_input: Obj1, arg_input: Obj2, env: EnvironmentRef)
 
     if procedure.is_native() {
         let args = flatten_list!(arg.clone(), "(apply) ill-formed argument list");
-        match (*procedure).clone().unwrap_native()(&args, env) {
+        match procedure.unwrap_native()(&args, env) {
             Ok(obj) => Ok(obj),
             Err(err) => {
                 Err(if err.source.is_some() {

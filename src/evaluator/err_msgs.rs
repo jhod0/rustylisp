@@ -60,7 +60,7 @@ macro_rules! macro_error {
 #[macro_export]
 macro_rules! read_error {
     ( $( $msg:expr ),* ) => {
-        runtime_error!( $crate::evaluator::err_msgs::SYNTAX_ERROR  $(, $msg )* )
+        runtime_error!( $crate::evaluator::err_msgs::READ_ERROR  $(, $msg )* )
     }
 }
 

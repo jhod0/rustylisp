@@ -37,16 +37,21 @@ impl RuntimeError {
 
     pub fn with_value<O>(self, value: O) -> Self 
                 where O: AsLispObjRef {
-        Self::new(self.errname, Some(value.to_obj_ref()),
-                  self.cause.map(|b| *b), self.source)
+        RuntimeError {
+            value: Some(value.to_obj_ref()), ..self
+        }
     }
 
     pub fn with_source(self, source: LispObjRef) -> Self {
-        Self::new(self.errname, self.value, self.cause.map(|b| *b), Some(source))
+        RuntimeError {
+            source: Some(source), ..self
+        }
     }
 
     pub fn with_cause(self, cause: RuntimeError) -> Self {
-        Self::new(self.errname, self.value, Some(cause), self.source)
+        RuntimeError {
+            cause: Some(Box::new(cause)), ..self
+        }
     }
 
     fn pop_cause(&mut self) -> Option<Self> {
@@ -85,7 +90,7 @@ impl RuntimeError {
     }
 
     pub fn into_lisp_obj(self) -> LispObj {
-        LispObj::LError(self)
+        LispObj::make_error(self)
     }
 }
 

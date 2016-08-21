@@ -5,6 +5,7 @@
 //!
 //! Check BUILTIN_FUNCS to be sure.
 mod io;
+mod math;
 
 use std::convert::AsRef;
 
@@ -22,8 +23,8 @@ use super::EvalResult;
 /// Native functions defined in the default lisp namespace
 pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&'static str>)] = &[
     // Arithmetic
-    ("+", add, Some(ADD_DOCSTR)), ("-", sub, Some(SUB_DOCSTR)), 
-    ("*", product, Some(PRODUCT_DOCSTR)), ("/", division, None),
+    ("+", math::add, Some(math::ADD_DOCSTR)), ("-", math::sub, Some(math::SUB_DOCSTR)), 
+    ("*", math::product, Some(math::PRODUCT_DOCSTR)), ("/", math::division, None),
 
     // Meta
     ("apply", apply, None), ("doc", doc, None), ("eval", eval, None), ("macro-expand", macro_expand, None),
@@ -38,6 +39,7 @@ pub static BUILTIN_FUNCS: &'static [(&'static str, NativeFuncSignature, Option<&
     ("symbol=?", symbol_eq, None), ("string=?", string_eq, None),
 
     // Accessors
+    ("error-source",  get_error_source, None),
     ("error-type",    get_error_type, None),
     ("error-value",   get_error_value, None),
     ("vector-length", get_vector_length, None),
@@ -88,107 +90,6 @@ pub fn builtin_vals() -> Vec<(&'static str, LispObj)> {
          (io::DIRECTORY_STACK_NAME, lisp_list![])]
 }
 
-fn add_two(a: &mut LispObj, b: &LispObj) -> EvalResult<()> {
-    *a = match (&*a, b) {
-        (&LispObj::LInteger(an), &LispObj::LInteger(bn))
-            => int!(an + bn),
-        (&LispObj::LInteger(an), &LispObj::LFloat(bn))
-            => float!((an as f64) + bn),
-        (&LispObj::LFloat(an), &LispObj::LInteger(bn))
-            => float!(an + (bn as f64)),
-        (&LispObj::LFloat(an), &LispObj::LFloat(bn))
-            => float!(an + bn),
-        (&LispObj::LInteger(_), right) 
-            => type_error!("expecting number, got {}", right),
-        (&LispObj::LFloat(_), right) 
-            => type_error!("expecting number, got {}", right),
-        (left, _) 
-            => type_error!("expecting number, got {}", left),
-    };
-    Ok(())
-}
-
-fn div_two(a: &mut LispObj, b: &LispObj) -> EvalResult<()> {
-    *a = match (&*a, b) {
-        (&LispObj::LInteger(an), &LispObj::LInteger(bn))
-            => float!((an as f64) / (bn as f64)),
-        (&LispObj::LInteger(an), &LispObj::LFloat(bn))
-            => float!((an as f64) / bn),
-        (&LispObj::LFloat(an), &LispObj::LInteger(bn))
-            => float!(an / (bn as f64)),
-        (&LispObj::LFloat(an), &LispObj::LFloat(bn))
-            => float!(an / bn),
-        (&LispObj::LInteger(_), right) 
-            => type_error!("expecting number, got {}", right),
-        (&LispObj::LFloat(_), right) 
-            => type_error!("expecting number, got {}", right),
-        (left, _) 
-            => type_error!("expecting number, got {}", left),
-    };
-
-    Ok(())
-}
-
-fn mult_two(a: &mut LispObj, b: &LispObj) -> EvalResult<()> {
-    *a = match (&*a, b) {
-        (&LispObj::LInteger(an), &LispObj::LInteger(bn))
-            => int!(an * bn),
-        (&LispObj::LInteger(an), &LispObj::LFloat(bn))
-            => float!((an as f64) * bn),
-        (&LispObj::LFloat(an), &LispObj::LInteger(bn))
-            => float!(an * (bn as f64)),
-        (&LispObj::LFloat(an), &LispObj::LFloat(bn))
-            => float!(an * bn),
-        (&LispObj::LInteger(_), right) 
-            => type_error!("expecting number, got {}", right),
-        (&LispObj::LFloat(_), right) 
-            => type_error!("expecting number, got {}", right),
-        (left, _) 
-            => type_error!("expecting number, got {}", left),
-    };
-
-    Ok(())
-}
-
-fn sub_two(a: &mut LispObj, b: &LispObj) -> EvalResult<()> {
-    *a = match (&*a, b) {
-        (&LispObj::LInteger(an), &LispObj::LInteger(bn))
-            => int!(an - bn),
-        (&LispObj::LInteger(an), &LispObj::LFloat(bn))
-            => float!((an as f64) - bn),
-        (&LispObj::LFloat(an), &LispObj::LInteger(bn))
-            => float!(an - (bn as f64)),
-        (&LispObj::LFloat(an), &LispObj::LFloat(bn))
-            => float!(an - bn),
-        (&LispObj::LInteger(_), right) 
-            => type_error!("expecting number, got {}", right),
-        (&LispObj::LFloat(_), right) 
-            => type_error!("expecting number, got {}", right),
-        (left, _) 
-            => type_error!("expecting number, got {}", left),
-    };
-
-    Ok(())
-}
-
-const ADD_DOCSTR: &'static str = "Performs addition.
-
-Throws a 'type-error if any arguments are not numbers.
-
-Examples:
-
-(+ 1 2 3)
-=> 6";
-pub fn add(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
-    let mut out = int!(0);
-
-    for num in args {
-        try!(add_two(&mut out, &**num));
-    }
-
-    Ok(out.to_obj_ref())
-}
-
 pub fn apply(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     unpack_args!(args => func: Any, arg: Any);
     super::apply(func, arg, env)
@@ -230,24 +131,6 @@ pub fn cons(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     Ok(cons!(left, right).to_obj_ref())
 }
 
-pub fn division(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
-    if args.len() == 0 {
-        arity_error!("(/) must have at least 1 argument")
-    } else if args.len() == 1 {
-        let mut one = int!(1);
-        try!(div_two(&mut one, &*args[0]));
-        Ok(one.to_obj_ref())
-    } else {
-        let mut out = (*args[0]).clone();
-
-        for num in &args[1..] {
-            try!(div_two(&mut out, &**num))
-        }
-
-        Ok(out.to_obj_ref())
-    }
-}
-
 pub fn doc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     unpack_args!(args => obj: Any);
 
@@ -255,7 +138,7 @@ pub fn doc(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
         LispObj::LNativeFunc(_, Some(ref docstr), _) => {
             Ok(string!(docstr.as_ref().clone()).to_obj_ref())
         },
-        LispObj::LProcedure(Procedure { documentation: Some(ref docstr), ..}) => {
+        LispObj::LProcedure(box Procedure { documentation: Some(ref docstr), ..}) => {
             Ok(string!(docstr.clone()).to_obj_ref())
         },
         _ => Ok(lisp_false!().to_obj_ref())
@@ -290,6 +173,14 @@ pub fn generate_vector(args: &[LispObjRef], env: EnvironmentRef) -> EvalResult {
     }).collect();
 
     Ok(LispObj::LVector(try!(vec)).to_obj_ref())
+}
+
+pub fn get_error_source(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
+    unpack_args!(args => err: LError);
+    match &err.source {
+        &Some(ref val)  => Ok(val.clone()),
+        &None           => Ok(nil!().to_obj_ref()),
+    }
 }
 
 pub fn get_error_type(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
@@ -437,27 +328,6 @@ pub fn make_vector(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     Ok(LispObj::make_vector((0..adjsize).map(|_| val.clone())).to_obj_ref())
 }
 
-const PRODUCT_DOCSTR: &'static str = "Performs multiplication.
-
-Throws a type-error if an argument is not a number.
-
-Examples:
-
-(*)
-;; => 1
-
-(* 1 2 3 4)
-;; => 12";
-pub fn product(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
-    let mut out = int!(1);
-
-    for num in args {
-        try!(mult_two(&mut out, &**num))
-    }
-
-    Ok(out.to_obj_ref())
-}
-
 pub fn string_append_objects(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     let mut out = String::new();
 
@@ -527,43 +397,6 @@ pub fn symbol_eq(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
     }
 
     Ok(lisp_bool!(out).to_obj_ref())
-}
-
-const SUB_DOCSTR: &'static str = "Performs subtraction.
-
-Throws a type-error if an argument is not a number.
-
-(- a b c d e ...)
-is equivalent to:
-(- a (+ b c d e ...))
-
-(- a)
-is equivalent to:
-(- 0 a)
-
-Examples:
-
-(- 5 3)
-=> 2
-
-(- 10 1 2 3 4)
-=> 0";
-pub fn sub(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
-    if args.len() == 0 {
-        arity_error!("(-) must have at least one argument")
-    } else if args.len() == 1 {
-        let mut zero = int!(0);
-        try!(sub_two(&mut zero, &*args[0]));
-        Ok(zero.to_obj_ref())
-    } else {
-        let mut out = (*args[0]).clone();
-
-        for num in &args[1..] {
-            try!(sub_two(&mut out, &**num))
-        }
-
-        Ok(out.to_obj_ref())
-    }
 }
 
 pub fn symbol_to_char(args: &[LispObjRef], _: EnvironmentRef) -> EvalResult {
