@@ -12,7 +12,6 @@ fn main() {
         env.repl()
     } else {
         for file in args.into_iter().skip(1) {
-            println!("Parsing file {}", &file);
             match env.load_from_file(file) {
                 Ok(obj) => println!("{}", obj),
                 Err(err) => err.dump_traceback()

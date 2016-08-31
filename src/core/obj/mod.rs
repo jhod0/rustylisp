@@ -1,10 +1,11 @@
 pub mod vec;
+pub use self::vec::PersistentVec;
 
 use std::fmt::{self, Display};
 use std::iter::FromIterator;
 use std::rc::Rc;
 
-pub use super::procedure::{Procedure};
+pub use super::procedure::Procedure;
 use super::{error, EnvironmentRef, EvalResult, RuntimeError};
 use self::LispObj::*;
 

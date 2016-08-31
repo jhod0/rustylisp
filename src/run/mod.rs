@@ -56,6 +56,7 @@ impl Evaluator {
         }
     }
 
+    // TODO mimic load-file and change directories
     pub fn load_from_file<P: AsRef<::std::path::Path>>(&mut self, path: P) -> EvalResult {
         let file_parser = Parser::from_file(path).unwrap();
         self.eval_all_from_parser(file_parser)
@@ -75,5 +76,11 @@ impl Evaluator {
             };
         }
         Ok(out)
+    }
+}
+
+impl Drop for Evaluator {
+    fn drop(&mut self) {
+        self.top_level.borrow_mut().clear_bindings()
     }
 }

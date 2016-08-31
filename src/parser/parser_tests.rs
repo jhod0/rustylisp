@@ -1,5 +1,5 @@
 use super::parser::Parser;
-use ::core::LispObj;
+use ::core::obj::LispObj;
 
 type Test<'a> = (&'a str, Vec<LispObj>);
 
@@ -13,7 +13,8 @@ macro_rules! tests {
     }
 }
 
-fn run_tests<'a>(tests: Vec<Test<'a>>) { for (input, expected) in tests {
+fn run_tests<'a>(tests: Vec<Test<'a>>) {
+    for (input, expected) in tests {
         let toks: Vec<_> = Parser::from_string(input, "<test>".to_string()).collect();
 
         println!("expected: {:?}\ntoks: {:?}", expected, toks);
@@ -29,7 +30,7 @@ fn run_tests<'a>(tests: Vec<Test<'a>>) { for (input, expected) in tests {
 
 #[test]
 fn test_parser_1() {
-    tests!(
+    tests! {
         "(1 2 3 4 5)" => { 
             LispObj::to_lisp_list((1..6).map(|n| int!(n)))
         },
@@ -37,12 +38,12 @@ fn test_parser_1() {
             symbol!("hello"),
             symbol!("there")
         }
-    );
+    };
 }
 
 #[test]
 fn test_parser_cons() {
-    tests!(
+    tests! {
         "(1 . 2)" => {
             cons!(int!(1), int!(2))
         },
@@ -52,5 +53,23 @@ fn test_parser_cons() {
         "(1 . (2 . (3 . (4))))" => {
             LispObj::to_lisp_list((1..5).map(|n| int!(n)))
         }
-    );
+    };
+}
+
+#[test]
+fn test_parser_vec() {
+    let empty: [LispObj; 0] = [];
+    tests! {
+        "[]" => {
+            LispObj::make_vector(empty.iter())
+        },
+        "[1 2 3]" => {
+            LispObj::make_vector([int!(1), int!(2), int!(3)].iter())
+        },
+        "[[1 2] [3 4] [5 6]]" => {
+            LispObj::make_vector((0..3).map(|n| {
+                LispObj::make_vector([int!(2*n + 1), int!(2*n + 2)].iter())
+            }))
+        }
+    };
 }

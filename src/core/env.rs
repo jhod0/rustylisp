@@ -47,31 +47,34 @@ impl Environment {
         Self::new().with_bindings(bindings)
     }
 
-    pub fn with_bindings<It>(self, bindings: It) -> Self 
+    pub fn with_bindings<It>(mut self, bindings: It) -> Self 
             where It: Iterator<Item=(String, LispObjRef)> {
         let mut bindmap = HashMap::new();
         for (name, val) in bindings {
             let _ = bindmap.insert(name, val);
         }
-        Environment { bindings: bindmap, ..self }
+        self.bindings = bindmap;
+        self
     }
 
-    pub fn with_macros<It>(self, bindings: It) -> Self
+    pub fn with_macros<It>(mut self, bindings: It) -> Self
             where It: Iterator<Item=(String, LispObjRef)> {
         let mut macros = HashMap::new();
         for (name, mac) in bindings {
             let _ = macros.insert(name, mac);
         }
-        Environment { macros: Some(macros), ..self }
+        self.macros = Some(macros);
+        self
     }
 
-    pub fn with_special_chars<It>(self, bindings: It) -> Self
+    pub fn with_special_chars<It>(mut self, bindings: It) -> Self
             where It: Iterator<Item=(char, LispObjRef)> {
         let mut chars = HashMap::new();
         for (name, handler) in bindings {
             let _ = chars.insert(name, handler);
         }
-        Environment { special_chars: Some(chars), ..self }
+        self.special_chars = Some(chars);
+        self
     }
 
     pub fn from_parent(parent: EnvironmentRef) -> Self {
@@ -208,10 +211,8 @@ impl Environment {
 
 
 // for debugging purposes
-/*
 impl Drop for Environment {
     fn drop(&mut self) {
-        println!("dropping environment with bindings: {:?}", self.bindings);
+        //println!("dropping environment with bindings: {:?}", self.bindings);
     }
 }
-*/
